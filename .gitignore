@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.worktrees/
+shots/*/
+!shots/.gitkeep
+*.diff.png
+.DS_Store

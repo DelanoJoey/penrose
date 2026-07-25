@@ -1,0 +1,33 @@
+# NOTICE
+
+## Third-party code adapted in this repository
+
+`tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
+from the capture/diff/profile harness in:
+
+    mshumer/Claude-of-Duty — https://github.com/mshumer/Claude-of-Duty
+    Copyright (c) 2026 mshumer
+    Licensed under the MIT License
+
+Two ideas in that harness are load-bearing here and were taken directly:
+
+1. **Per-shot page isolation.** Reusing one browser page across shots leaks
+   particle age, accumulation buffers and auto-exposure state forward, so
+   repeated runs of the same capture set diverge. Isolating each shot in a
+   fresh page is what makes the comparison bit-reproducible, and therefore what
+   makes a per-pixel diff usable as a gate at all.
+
+2. **Hitch attribution via per-frame WebGL program counts.** A median frame
+   time hides exactly the stalls that make an interactive scene feel broken. A
+   jump in `renderer.info.programs.length` on the same frame as a spike
+   identifies the spike as a shader-compilation stall.
+
+The upstream MIT license text is reproduced above and applies to those portions.
+
+## What differs here
+
+The upstream harness was retrofitted onto a finished project, which required a
+separate remediation pass to remove wall-clock dependencies before the pixel
+gate could pass. This repository inverts that order: the determinism contract in
+`ARCHITECTURE.md` is a precondition on all code, and the gate was proven green
+against a stub scene before any content existed. See `METHODOLOGY.md`.
