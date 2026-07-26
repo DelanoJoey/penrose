@@ -1,0 +1,49 @@
+{
+  "candidates": [
+    {
+      "name": "draft",
+      "wins": 0,
+      "n": 9,
+      "winRate": 0,
+      "ci95": {
+        "lower": 0,
+        "upper": 0.2992,
+        "width": 0.2992,
+        "method": "wilson",
+        "z": 1.96
+      },
+      "exactP": 0.003906,
+      "verdict": "worse"
+    },
+    {
+      "name": "dusk",
+      "wins": 0,
+      "n": 9,
+      "winRate": 0,
+      "ci95": {
+        "lower": 0,
+        "upper": 0.2992,
+        "width": 0.2992,
+        "method": "wilson",
+        "z": 1.96
+      },
+      "exactP": 0.003906,
+      "verdict": "worse"
+    }
+  ],
+  "positionBias": {
+    "leftPicks": 8,
+    "total": 18,
+    "leftRate": 0.4444,
+    "suspect": false
+  },
+  "agreement": {
+    "judges": [
+      "judge1"
+    ],
+    "pairwise": [],
+    "meanPairwiseAgreement": null,
+    "nearChance": false
+  },
+  "unknownPairIds": []
+}

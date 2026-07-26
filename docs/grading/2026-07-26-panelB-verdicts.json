@@ -1,0 +1,452 @@
+[
+  {
+    "pairId": "dusk--offaxis",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot1",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--rot1",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot3",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--avatar",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot2",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--avatarmid",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot2",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--hero",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--avatarmid",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--avatar",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--seam",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--wide",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--seam",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--hero",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot3",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--offaxis",
+    "judge": "judge1",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--wide",
+    "judge": "judge1",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--offaxis",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot1",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--rot1",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot3",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--avatar",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot2",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--avatarmid",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot2",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--hero",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--avatarmid",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--avatar",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--seam",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--wide",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--seam",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--hero",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot3",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--offaxis",
+    "judge": "judge2",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--wide",
+    "judge": "judge2",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--offaxis",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot1",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--rot1",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot3",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--avatar",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot2",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--avatarmid",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot2",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--hero",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--avatarmid",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--avatar",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--seam",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--wide",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--seam",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--hero",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot3",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--offaxis",
+    "judge": "judge3",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--wide",
+    "judge": "judge3",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--offaxis",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot1",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--rot1",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot3",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--avatar",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot2",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--avatarmid",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot2",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--hero",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--avatarmid",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--avatar",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--seam",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--wide",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--seam",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--hero",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot3",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--offaxis",
+    "judge": "judge4",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--wide",
+    "judge": "judge4",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--offaxis",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot1",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--rot1",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot3",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--avatar",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--rot2",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--avatarmid",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot2",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--hero",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--avatarmid",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--avatar",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--seam",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--wide",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--seam",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "draft--hero",
+    "judge": "judge5",
+    "choice": "right"
+  },
+  {
+    "pairId": "dusk--rot3",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "draft--offaxis",
+    "judge": "judge5",
+    "choice": "left"
+  },
+  {
+    "pairId": "dusk--wide",
+    "judge": "judge5",
+    "choice": "right"
+  }
+]

@@ -1,0 +1,134 @@
+{
+  "candidates": [
+    {
+      "name": "draft",
+      "wins": 0,
+      "n": 45,
+      "winRate": 0,
+      "ci95": {
+        "lower": 0,
+        "upper": 0.0787,
+        "width": 0.0787,
+        "method": "wilson",
+        "z": 1.96
+      },
+      "exactP": 0,
+      "verdict": "worse"
+    },
+    {
+      "name": "dusk",
+      "wins": 0,
+      "n": 45,
+      "winRate": 0,
+      "ci95": {
+        "lower": 0,
+        "upper": 0.0787,
+        "width": 0.0787,
+        "method": "wilson",
+        "z": 1.96
+      },
+      "exactP": 0,
+      "verdict": "worse"
+    }
+  ],
+  "positionBias": {
+    "leftPicks": 40,
+    "total": 90,
+    "leftRate": 0.4444,
+    "suspect": false
+  },
+  "agreement": {
+    "judges": [
+      "judge1",
+      "judge2",
+      "judge3",
+      "judge4",
+      "judge5"
+    ],
+    "pairwise": [
+      {
+        "judges": [
+          "judge1",
+          "judge2"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge1",
+          "judge3"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge1",
+          "judge4"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge1",
+          "judge5"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge2",
+          "judge3"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge2",
+          "judge4"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge2",
+          "judge5"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge3",
+          "judge4"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge3",
+          "judge5"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "judge4",
+          "judge5"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      }
+    ],
+    "meanPairwiseAgreement": 1,
+    "nearChance": false
+  },
+  "unknownPairIds": []
+}

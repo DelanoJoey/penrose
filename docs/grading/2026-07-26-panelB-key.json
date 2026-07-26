@@ -1,0 +1,131 @@
+{
+  "seed": "penrose-p9-artdirection",
+  "pairs": [
+    {
+      "pairId": "draft--avatar",
+      "candidate": "draft",
+      "item": "avatar",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "draft--avatarmid",
+      "candidate": "draft",
+      "item": "avatarmid",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "draft--hero",
+      "candidate": "draft",
+      "item": "hero",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "draft--offaxis",
+      "candidate": "draft",
+      "item": "offaxis",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "draft--rot1",
+      "candidate": "draft",
+      "item": "rot1",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "draft--rot2",
+      "candidate": "draft",
+      "item": "rot2",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "draft--rot3",
+      "candidate": "draft",
+      "item": "rot3",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "draft--seam",
+      "candidate": "draft",
+      "item": "seam",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "draft--wide",
+      "candidate": "draft",
+      "item": "wide",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "dusk--avatar",
+      "candidate": "dusk",
+      "item": "avatar",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "dusk--avatarmid",
+      "candidate": "dusk",
+      "item": "avatarmid",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "dusk--hero",
+      "candidate": "dusk",
+      "item": "hero",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "dusk--offaxis",
+      "candidate": "dusk",
+      "item": "offaxis",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "dusk--rot1",
+      "candidate": "dusk",
+      "item": "rot1",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "dusk--rot2",
+      "candidate": "dusk",
+      "item": "rot2",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "dusk--rot3",
+      "candidate": "dusk",
+      "item": "rot3",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "dusk--seam",
+      "candidate": "dusk",
+      "item": "seam",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "dusk--wide",
+      "candidate": "dusk",
+      "item": "wide",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    }
+  ]
+}
