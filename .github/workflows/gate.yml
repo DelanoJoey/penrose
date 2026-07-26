@@ -14,7 +14,22 @@ jobs:
   gate:
     name: build + determinism gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30, not 20. The gate step went from ~30s to 10m41s when the P3 art
+    # direction landed, which is 53% of a 20-minute budget and would have made
+    # the next scene change break CI rather than merely slow it.
+    #
+    # MEASURED CAUSE, not guessed: triangles per frame went 208 -> 128,400, and
+    # 128,000 of those are the paper ground's PlaneGeometry(1,1,320,200). CI has
+    # no GPU and rasterises via SwiftShader, so re-rendering that static backdrop
+    # for all 90 settle frames of each of 9 shots, twice, is the whole cost.
+    # Reproduced locally by forcing --use-gl=swiftshader: 4.4s per shot for
+    # pump(90)+screenshot, versus milliseconds on Metal.
+    #
+    # This is headroom, NOT a fix. The real fix is to bake the paper once into a
+    # render target and draw one textured quad, taking it from 128,000 triangles
+    # to 2 while preserving the art exactly. That is an art-owner decision
+    # because it trades textures 0 -> 1, so it is deliberately not done here.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4

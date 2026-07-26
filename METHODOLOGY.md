@@ -429,6 +429,31 @@ sixteen more instances on an InstancedMesh that already existed.
 | `node tools/gate.mjs` | `identical: true` across 9 shots, exit 0 |
 | commit-frame delta | `identical: true`, 0/0 |
 
+### The cost local profiling could not see
+
+CI passed, but the gate step went from **~30 s to 10 m 41 s** — 53% of the
+20-minute job budget. Three profiler runs on this machine showed nothing wrong,
+because this machine has a GPU and the CI runner does not.
+
+Measured cause, not guessed: triangles per frame went **208 → 128,400**, and
+128,000 of those are the paper ground's `PlaneGeometry(1, 1, 320, 200)`. CI
+rasterises via SwiftShader, so re-rendering that static backdrop for all 90
+settle frames of each of 9 shots, twice, is the entire cost. Reproduced locally
+by forcing `--use-gl=swiftshader`: **4.4 s per shot** for `pump(90)` plus
+screenshot, versus milliseconds on Metal.
+
+This is the second time in this project that a number looked fine and meant
+nothing — the first was the fps figure that measures rAF dispatch overhead. The
+pattern is the same both times: **a measurement taken under conditions the target
+does not share.** The structural budget (draw calls, programs, heap) was held
+exactly and still failed to predict a 20× wall-clock regression, because it
+counts objects rather than the cost of rasterising them.
+
+The job timeout was raised to 30 minutes as *headroom, not a fix*. The real fix
+is to bake the paper once into a render target and draw a single textured quad —
+128,000 triangles down to 2, art preserved exactly — which trades `textures 0 → 1`
+and is therefore an art-owner decision rather than a unilateral one.
+
 ---
 
 ## Attribution
