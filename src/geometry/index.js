@@ -78,12 +78,24 @@ export const HORIZONTAL_STEPS = [
 ];
 
 /**
- * All six screen-lattice neighbours.
+ * All six screen-lattice neighbours: the screen positions a single unit move in
+ * 3D can reach. Used by enclosedHoles as the adjacency its flood fill walks.
  *
- * Because a + b is always even, the reachable screen lattice is a HEX grid and
- * not a 4-connected square one. A flood fill using only HORIZONTAL_STEPS leaks
- * through the +/-y gaps and reports that nothing is enclosed — which is why
- * enclosedHoles below uses all six and holes.test.js pins the counts.
+ * MEASURED CORRECTION. An earlier version of this comment claimed a fill using
+ * only HORIZONTAL_STEPS "leaks through the +/-y gaps and reports that nothing is
+ * enclosed". Both halves are wrong, and substituting HORIZONTAL_STEPS here was
+ * verified to leave holes.test.js at 6/6:
+ *
+ *   - the four horizontal steps GENERATE the vertical ones, since
+ *     (+1,+1) + (-1,+1) = (0,+2), so both sets reach the same lattice;
+ *   - and a smaller neighbourhood makes a fill MORE restricted, so the error
+ *     would be over-reporting enclosure, never under-reporting it.
+ *
+ * Six is still the honest adjacency — it is what a unit move actually reaches —
+ * and the two sets can only diverge on a figure whose wall blocks all four
+ * diagonal steps while leaving a +/-y opening. No such figure is in the fixture
+ * set, so this is correctness by construction rather than by test coverage, and
+ * saying so is the point.
  */
 export const SCREEN_NEIGHBOURS = Object.values(SCREEN_DELTA);
 
@@ -226,9 +238,15 @@ export class Structure {
     const minB = Math.min(...keys.map((k) => k[1])) - 2;
     const maxB = Math.max(...keys.map((k) => k[1])) + 2;
 
-    // Flood the empty complement inward from the border ring. Two rows deep on
-    // the b axis because the +/-y step is (0,+/-2) and a one-row seed would
-    // leave the opposite parity unreachable.
+    // Flood the empty complement inward from the border ring.
+    //
+    // The b rows are seeded two deep because the +/-y step is (0,+/-2) and a
+    // one-row seed reaches only one parity. MEASURED: this is redundant on the
+    // current fixtures -- the minA/maxA column loop below already seeds both
+    // parities, and dropping the second row leaves holes.test.js at 6/6. Kept
+    // because it makes the seed correct on its own terms rather than correct by
+    // accident of another loop, but it is NOT covered, and a future edit that
+    // removes the column loop would silently depend on it.
     const outside = new Set();
     const queue = [];
     const visit = (a, b) => {
