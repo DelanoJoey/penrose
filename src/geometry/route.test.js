@@ -69,3 +69,36 @@ test('start equal to goal yields an empty route, not null', () => {
   const route = new Structure(lv.cells).findRoute(lv.start, lv.start);
   assert.deepEqual(route, []);
 });
+
+test('loop-01 does NOT require a turn, and premise says so', () => {
+  const lv = LEVELS['loop-01'];
+  const p = new Structure(lv.cells).premise(lv.start, lv.goal);
+  assert.equal(p.solvable, true);
+  assert.equal(p.requiresTurn, false, 'loop-01 opens already solvable');
+  assert.equal(p.turnsInRoute, 0);
+  assert.equal(p.walksInRoute, 1);
+  assert.equal(p.usesIllusion, true);
+  assert.deepEqual(p.flatSolvableTurns, [0]);
+});
+
+test('premise reports requiresTurn when no flat path exists at turn 0', () => {
+  const cells = [
+    [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
+    [0, 0, 1], [0, 1, 1], [0, 2, 1],
+    [0, 3, 0], [1, 3, 0], [2, 3, 0],
+  ];
+  const p = new Structure(cells).premise([0, 0, 0], [2, 3, 0]);
+  assert.equal(p.solvable, true);
+  assert.equal(p.requiresTurn, true);
+  assert.deepEqual(p.flatSolvableTurns, []);
+  assert.ok(p.turnsInRoute >= 2);
+  assert.equal(p.usesIllusion, true);
+  assert.equal(p.route[0].kind, 'walk', 'this level must be playable on frame one');
+});
+
+test('an unsolvable level reports solvable false and requiresTurn false', () => {
+  const p = new Structure([[0, 0, 0], [0, 40, 0]]).premise([0, 0, 0], [0, 40, 0]);
+  assert.equal(p.solvable, false);
+  assert.equal(p.requiresTurn, false, 'unreachable is not "requires a turn"');
+  assert.equal(p.usesIllusion, false);
+});
