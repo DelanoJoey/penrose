@@ -766,8 +766,26 @@ shots. The correct prediction from the static rate would have been ≈ 8.4 s.
 
 The measurement is *below* even the corrected figure, because motion shots pump 7, 14
 and 27 frames rather than the default 90 — a motion shot is **cheaper** than a static
-one. Two estimates in a row have now been wrong in this repository, in opposite
-directions. Measure.
+one.
+
+**And then CI disagreed with the local measurement too.** Comparing the `Determinism
+gate` step on the real runner:
+
+| run | shots | gate step |
+|---|---|---|
+| `30210393896` (P5 on main) | 12 | **155 s** |
+| `30212724921` (P6) | 15 | **164 s** |
+
+**+9 s observed, against +4.9 s predicted from the local SwiftShader measurement** —
+low by roughly 1.8×. One sample each, so runner variance is a plausible explanation
+and this is not a strong result on its own. It is recorded because the alternative is
+leaving a laptop figure standing as though it were a CI figure, which is the exact
+mistake §P3 documents.
+
+Three cost estimates in this repository have now missed, in both directions. The
+figure that matters is the one taken under the conditions the target actually runs
+in, and even that wants more than one sample. Nothing here is close to the 30-minute
+timeout, so the practical answer is unchanged.
 
 ### What this widens, deliberately
 
