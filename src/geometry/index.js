@@ -77,6 +77,16 @@ export const HORIZONTAL_STEPS = [
   SCREEN_DELTA['+z'], SCREEN_DELTA['-z'],
 ];
 
+/**
+ * All six screen-lattice neighbours.
+ *
+ * Because a + b is always even, the reachable screen lattice is a HEX grid and
+ * not a 4-connected square one. A flood fill using only HORIZONTAL_STEPS leaks
+ * through the +/-y gaps and reports that nothing is enclosed — which is why
+ * enclosedHoles below uses all six and holes.test.js pins the counts.
+ */
+export const SCREEN_NEIGHBOURS = Object.values(SCREEN_DELTA);
+
 /** Rotate a cell by quarter turns about Y. (x,y,z) -> (z, y, -x) per turn. */
 export function rotateY([x, y, z], turns) {
   let cx = x, cz = z;
@@ -187,6 +197,69 @@ export class Structure {
       }
     }
     return out.sort((p, q) => (p.from < q.from ? -1 : p.from > q.from ? 1 : p.to < q.to ? -1 : 1));
+  }
+
+  /**
+   * Screen positions the figure ENCLOSES: empty, and unable to reach the
+   * outside of the bounding box.
+   *
+   * WHY THIS EXISTS. An impossible figure needs somewhere for the eye to trace
+   * the loop. A closed circuit that folds back on itself projects as a filled
+   * slab and reads as an ordinary solid however good its routing premise is —
+   * which is exactly how a previous phase rendered a four-leg circuit and got
+   * a rectangular bar. Closure is necessary and not sufficient; this is the
+   * other necessary condition.
+   *
+   * NECESSARY, NOT SUFFICIENT EITHER. holes.test.js pins a figure with three
+   * enclosed cells that still reads as an ordinary staircase. This is a filter
+   * that removes most of the garbage before a render is spent. It is not a
+   * judge, and it does not replace looking at the image.
+   */
+  enclosedHoles(turns = 0) {
+    if (!this.cells.length) return [];
+    const rot = this.cells.map((c) => rotateY(c, turns));
+    const occupied = new Set(rot.map((c) => screenId(...c)));
+
+    const keys = rot.map((c) => screenKey(...c));
+    const minA = Math.min(...keys.map((k) => k[0])) - 2;
+    const maxA = Math.max(...keys.map((k) => k[0])) + 2;
+    const minB = Math.min(...keys.map((k) => k[1])) - 2;
+    const maxB = Math.max(...keys.map((k) => k[1])) + 2;
+
+    // Flood the empty complement inward from the border ring. Two rows deep on
+    // the b axis because the +/-y step is (0,+/-2) and a one-row seed would
+    // leave the opposite parity unreachable.
+    const outside = new Set();
+    const queue = [];
+    const visit = (a, b) => {
+      if (((a + b) % 2 + 2) % 2 !== 0) return;      // odd cells are off-lattice
+      const k = `${a},${b}`;
+      if (occupied.has(k) || outside.has(k)) return;
+      outside.add(k);
+      queue.push([a, b]);
+    };
+    for (let a = minA; a <= maxA; a++) {
+      visit(a, minB); visit(a, minB + 1); visit(a, maxB); visit(a, maxB - 1);
+    }
+    for (let b = minB; b <= maxB; b++) { visit(minA, b); visit(maxA, b); }
+    while (queue.length) {
+      const [a, b] = queue.shift();
+      for (const [da, db] of SCREEN_NEIGHBOURS) {
+        const na = a + da, nb = b + db;
+        if (na < minA || na > maxA || nb < minB || nb > maxB) continue;
+        visit(na, nb);
+      }
+    }
+
+    const enclosed = [];
+    for (let a = minA; a <= maxA; a++) {
+      for (let b = minB; b <= maxB; b++) {
+        if (((a + b) % 2 + 2) % 2 !== 0) continue;
+        const k = `${a},${b}`;
+        if (!occupied.has(k) && !outside.has(k)) enclosed.push(k);
+      }
+    }
+    return enclosed.sort();
   }
 
   /** Breadth-first path between two standable cells. Null if unreachable. */
