@@ -1,0 +1,262 @@
+[
+  {
+    "lens": "colour",
+    "frames": [
+      {
+        "frame": "frame-01",
+        "score": 6,
+        "label": "CLOSE"
+      },
+      {
+        "frame": "frame-02",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-03",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-04",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-05",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-06",
+        "score": 6,
+        "label": "CLOSE"
+      },
+      {
+        "frame": "frame-07",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-08",
+        "score": 6,
+        "label": "CLOSE"
+      },
+      {
+        "frame": "frame-09",
+        "score": 4,
+        "label": "AMATEUR"
+      }
+    ],
+    "overall": 5.0,
+    "summary": "Colour is assigned by face orientation rather than by material, with every hue pinned near maximum chroma and no tinting, ambient occlusion or contact shadow, so objects read as three unrelated coloured planes glued together instead of solids \u2014 and the crimson/navy pair is close enough in luminance that wherever a red face meets a blue one (worst in frame-09) the silhouette collapses into one dark mass on any dim display. Secondary tells: the same bright yellow doubles as both a highlight tile and an arbitrary lighting variant, and hairline red/black seam bleed along beam edges is visible artefact noise a shipped title would have caught."
+  },
+  {
+    "lens": "communication",
+    "frames": [
+      {
+        "frame": "frame-01",
+        "score": 6,
+        "label": "CLOSE"
+      },
+      {
+        "frame": "frame-02",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-03",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-04",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-05",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-06",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-07",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-08",
+        "score": 6,
+        "label": "CLOSE"
+      },
+      {
+        "frame": "frame-09",
+        "score": 3,
+        "label": "AMATEUR"
+      }
+    ],
+    "overall": 4.3,
+    "summary": "Nothing in any frame states an objective \u2014 there is no goal marker, no UI, no path affordance, and the one candidate (a slightly brighter yellow tile) is the same hue family as every walkable surface and is sometimes under the player, so the images teach you the shape but never the game. Compounding it, the impossible join \u2014 the whole trick \u2014 is never staged near the character, and the player is a featureless, orientation-less green nub that shrinks to noise in frame-02 and is almost entirely occluded by level geometry in frame-09."
+  },
+  {
+    "lens": "composition",
+    "frames": [
+      {
+        "frame": "frame-01",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-02",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-03",
+        "score": 6,
+        "label": "CLOSE"
+      },
+      {
+        "frame": "frame-04",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-05",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-06",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-07",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-08",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-09",
+        "score": 3,
+        "label": "AMATEUR"
+      }
+    ],
+    "overall": 4.4,
+    "summary": "Every frame is a bounding-box-centred object floating on a blank field at an arbitrary zoom, so the negative space is leftover rather than shaped and no line, margin or scale decision ever leads the eye to the green player token \u2014 worst in frame-09, where the geometry occludes the player outright, and frame-02, where the subject is a distant speck. Only frame-03's close-up shows any deliberate framing (diagonal lead-in, scale contrast), and even there the crop dumps an inert empty wedge into the strongest quadrant and throws away the impossible figure that is the game's entire premise."
+  },
+  {
+    "lens": "storefront",
+    "frames": [
+      {
+        "frame": "frame-01",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-02",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-03",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-04",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-05",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-06",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-07",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-08",
+        "score": 5,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-09",
+        "score": 3,
+        "label": "AMATEUR"
+      }
+    ],
+    "overall": 4.0,
+    "summary": "Every frame lacks a presentation layer \u2014 no UI or HUD of any kind, no contact shadow under the avatar (it visibly floats), no lighting beyond three flat per-orientation face tints, and no environment or character design \u2014 so these read as geometry-renderer captures rather than screenshots of a released product. Compounding it: visible tile seams and z-fight slivers inside single-colour beams, uncomposed camera framing (tiny subject in frame-02, hard three-edge crop in frame-03), unsupported floating slabs in frames 04/05/06, and what looks like a depth-sort error slicing the player piece in frame-09."
+  },
+  {
+    "lens": "surface",
+    "frames": [
+      {
+        "frame": "frame-01",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-02",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-03",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-04",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-05",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-06",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-07",
+        "score": 3,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-08",
+        "score": 4,
+        "label": "AMATEUR"
+      },
+      {
+        "frame": "frame-09",
+        "score": 3,
+        "label": "AMATEUR"
+      }
+    ],
+    "overall": 3.3,
+    "summary": "All the material craft lives in the background plate \u2014 a genuinely nice warm paper grain \u2014 and none of it reaches the object, which is untextured flat fill on a three-tone ramp with no gradient, no ambient occlusion, no contact shadow under the pawn, and stepped diagonals. Worse, every frame carries visible bright-red z-fight hairlines bleeding along the bottom edges of blue faces, plus tonal breaks mid-face on surfaces that should read continuous, so it looks like a blockout captured against a finished backdrop."
+  }
+]

@@ -1120,6 +1120,153 @@ and everything downstream is.
 
 ---
 
+## P9 — graded, at last, and the premise did not survive it
+
+**Completed 2026-07-26.** `blind-panel` and `tools/grade.mjs` had existed since
+P4 and this project had never been scored against anything. It has now. Raw
+verdicts and tallies are in `docs/grading/`.
+
+### The headline is a negative result
+
+Five adversarial critics, each with a different lens, scored nine frames 1–10 on
+*how close is this to a professionally shipped, commercially released game in its
+own style* — explicitly instructed that marking it down for not being photoreal
+would be a category error.
+
+| lens | mean | range | CLOSE |
+|---|---|---|---|
+| colour | 5.0 | 4–6 | 3/9 |
+| composition | 4.4 | 3–6 | 1/9 |
+| communication | 4.3 | 3–6 | 2/9 |
+| storefront | 4.0 | 3–5 | 0/9 |
+| surface | **3.3** | 3–4 | 0/9 |
+
+**Overall: mean 4.22, median 4.0, stdev 1.04. AMATEUR 39, CLOSE 6, SHIPPED 0.**
+
+The benchmark this project defines itself against is in §The premise:
+Claude-of-Duty scored **3.59 → 4.14 → 4.05 → 5.05** out of 10 against a modern
+Call of Duty, with two shots reaching CLOSE and the rest AMATEUR.
+
+Penrose scores **inside that band, and below its final round.** The premise —
+*"choose a target where that ceiling does not exist"* — predicted that a
+stylised isometric target would escape the photoreal ceiling. Measured against
+its own genre's commercial bar, it did not.
+
+Three qualifications, none of which rescue the claim:
+
+- Claude-of-Duty's 5.05 came after **four rounds** of iteration. This is one round.
+- Different panels, rubrics, judges and eras. Indicative, not rigorous.
+- **The judged plates deliberately carry no HUD** — `src/ui/index.js:315` hides it
+  under `config.capture` — and the storefront critic marked it down for exactly
+  that. So 4.22 is a **floor** on the game as played, not an estimate of it.
+
+The honest reading is that target selection bought less than the premise claimed,
+and that the gap is craft: shading, contact shadows, framing and a presentation
+layer, none of which the target choice supplies for free.
+
+### The panel found defects the pixel gate is structurally blind to
+
+Three lenses independently reported hairline artifacts at beam edges. Magnified
+3× on `hero` and `crook06`, two are confirmed present in the shipped render:
+
+- **bright slivers along the bottom edges** of red and blue faces;
+- **tonal breaks mid-face** on surfaces that should read continuous.
+
+This is the finding worth more than the score. **18 gated shots, 181 tests and a
+green gate coexist with visible rendering artifacts**, because the gate proves
+two captures are *identical*, never that either is *correct*. Determinism is not
+correctness, the distinction has been implicit in `ARCHITECTURE.md` §5 since P0,
+and one adversarial pass surfaced what the gate cannot express.
+
+### The art direction call was right, and now measured
+
+A genuinely blind panel — three variants of the same scene, judges unable to know
+which shipped — over 9 shots × 2 candidates:
+
+| candidate | wins | winRate | CI95 | verdict |
+|---|---|---|---|---|
+| `dusk` (night palette) | 0 / 9 | 0 | [0, 0.2992] | worse |
+| `draft` (greybox) | 0 / 9 | 0 | [0, 0.2992] | worse |
+
+Position bias clean: left chosen 44.4%, `suspect: false`. The riso direction P3
+chose beat both losing candidates on **every one of 18 comparisons**.
+
+### Two corrections applied to this phase's own method
+
+**The tool's reported `n` was wrong and the headline interval with it.** All five
+judges returned byte-identical verdicts, so 90 verdicts are 18 independent
+observations. `tally` computed a Wilson interval on n=45 giving `[0, 0.0787]`;
+collapsed to one effective judge the same code path gives **`[0, 0.2992]`**,
+nearly 4× wider. Only the second is reported.
+
+**`meanPairwiseAgreement: 1.0` is vacuous and is not counted as evidence.**
+`blind-panel` computes inter-rater agreement to catch a panel that detected no
+shared signal. Five instances of one model cannot fail that check — perfect
+agreement measures **determinism, not consensus** — so `problemsWith` returning
+clean proves nothing. This is the same shape as every other green-but-meaningless
+result in this record.
+
+The fix, applied to the rubric panel: **differentiate the judges.** Five distinct
+lenses produced a 1.7-point spread and converged independently on the same two
+weakest frames (`wide` and `crook06`, both 3.2). Differentiation is what turns a
+panel into a measurement.
+
+### A leak caught before judging, not after
+
+`grade.mjs` names composites `<candidate>--<shot>.png`. Judges reading filenames
+would learn which candidate was in the pair, and "draft" additionally connotes
+*unfinished*. Side assignment was still blind, so the position-bias statistic was
+safe, but the verdict itself was exposed to a word. Judges saw `image-01..18` in a
+salted-hash order instead.
+
+### What was abandoned, and why
+
+The planned thesis test was penrose against Monument Valley through the same
+pairwise harness. It was dropped before any number was produced:
+
+- **Sourcing.** One cleanly obtainable fair-use frame, not nine. The rest would
+  have meant scraping a fan site.
+- **Format confound, which is fatal on its own.** Penrose plates are 3224×1000
+  poster compositions; Monument Valley frames are portrait phone screenshots
+  carrying game UI. That comparison measures presentation format, not art — *a
+  measurement taken under conditions the target does not share*, which is the
+  failure this record has already documented three times.
+- **Blinding would have been cosmetic.** Flat riso against soft-gradient pastel
+  is not confusable; every judge identifies both instantly. Claude-of-Duty's
+  blind A/B was meaningful because both sides were photoreal military frames.
+
+The absolute rubric replaced it, and answers the same question better: it is the
+question Claude-of-Duty's critics actually answered, so the numbers compare.
+
+### Verification
+
+| check | result |
+|---|---|
+| art variants genuinely distinct | 27 of 27 captured files distinct by sha256 |
+| Panel B side balance | `worstSkew: 1`, the minimum achievable at 9 shots |
+| Panel B position bias | leftRate 0.4444, `suspect: false` |
+| Panel B tally | exit 0, both candidates `worse` |
+| Panel A spread | 1.7 points across five lenses — not pseudo-replicates |
+| defect reports | 2 of 2 confirmed by 3× magnification |
+| raw data | `docs/grading/` — verdicts, key, both tallies, all five lens sheets |
+
+### Still open
+
+- **Two confirmed rendering defects**, unfixed: bottom-edge slivers and mid-face
+  tonal breaks. Neither is expressible as a gate failure, so fixing them needs a
+  check the repository does not currently have.
+- **The gate cannot see correctness.** The single largest gap in this project's
+  verification story, and now demonstrated rather than suspected.
+- **4.22 is a floor, not a score.** Re-run against frames that include the HUD
+  before treating it as the game's number.
+- The panel is five instances of one model with different prompts. Different
+  models, or a human, would be a stronger panel — and would let inter-rater
+  agreement mean something.
+- Unchanged from P8: `crook-06` is 55% rotations and unplaytested for tedium; no
+  persistence; no ending; the `-1` orbit uncaptured; `_emit` has no try/catch.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
