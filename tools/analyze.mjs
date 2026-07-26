@@ -76,6 +76,8 @@ if (!decl) {
     problems.push(`declares illusion: ${decl.illusion} but measured usesIllusion: ${p.usesIllusion}`);
   if (decl.minWalks != null && p.walksInRoute < decl.minWalks)
     problems.push(`declares minWalks: ${decl.minWalks} but the route has ${p.walksInRoute}`);
+  if (decl.minTurns != null && p.turnsInRoute < decl.minTurns)
+    problems.push(`declares minTurns: ${decl.minTurns} but the route has ${p.turnsInRoute}`);
   if (decl.openWithWalk && p.route?.[0]?.kind !== 'walk')
     problems.push('declares openWithWalk but the route opens with a turn — the level is unplayable on frame one');
 }
