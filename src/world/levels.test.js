@@ -25,6 +25,8 @@ for (const [name, lv] of Object.entries(LEVELS)) {
     assert.equal(p.usesIllusion, d.illusion, `${name} declares illusion: ${d.illusion}`);
 
     if (d.minWalks != null) assert.ok(p.walksInRoute >= d.minWalks);
+    if (d.minTurns != null) assert.ok(p.turnsInRoute >= d.minTurns,
+      `${name} declares minTurns: ${d.minTurns} but the route has ${p.turnsInRoute}`);
     if (d.openWithWalk) assert.equal(p.route[0]?.kind, 'walk');
   });
 }
