@@ -44,18 +44,33 @@ const HOP = 0.15;
  */
 const CLEARANCE = 3;
 
-/** Pawn dimensions and its three face tones — accent-family, mint. */
+/**
+ * Pawn dimensions and its face tones — the drafting accent, a red annotation
+ * mark on a near-monochrome sheet.
+ *
+ * TWO TONES, NOT THREE, AND THAT IS DELIBERATE. src/render's convention gives a
+ * light top and two distinct side values, and the level kit follows it. The pawn
+ * does not: its two side tones are EQUAL. The reason is the tone convention the
+ * world now uses — the light is fixed in the world, so a quarter turn rotates
+ * the cells' shading with them, and in the odd rotation states the mid and dark
+ * side values exchange sides on screen. The pawn's mesh is never rotated by the
+ * world turn (src/player positions it, src/geometry rotates the cell it stands
+ * on), so a pawn with two distinct side values would be lit from the opposite
+ * side to everything around it in half of the rotation states. Equal side tones
+ * make it rotation-invariant, and they read correctly for what it is: the marker
+ * on the drawing, drawn flat in the annotation colour, not another solid.
+ *
+ * Deliberately NOT imported from src/render — ARCHITECTURE.md §3.3 forbids
+ * subsystems importing each other, and src/geometry is the only permitted direct
+ * reach. These are the accent family of PALETTE.accent (0xc6482f).
+ */
 const AVATAR = {
   height: 0.8,
   radiusBottom: 0.34,
   radiusTop: 0.22,
-  /** Matching src/render's convention: up-facing gets the light tone, the two
-   *  horizontal axes get the mid and dark tones. Deliberately NOT imported from
-   *  src/render — ARCHITECTURE.md §3.3 forbids subsystems importing each other,
-   *  and src/geometry is the only permitted direct reach. */
-  top: 0xdefff7,
-  left: 0x5fc9ba,
-  right: 0x3f9a92,
+  top: 0xd85f42,
+  left: 0xa8351f,
+  right: 0xa8351f,
 };
 
 // ---------------------------------------------------------------- mesh build

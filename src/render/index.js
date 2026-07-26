@@ -5,45 +5,161 @@ import * as THREE from 'three';
  *
  * Deliberately flat-shaded: face colour comes from the face normal, not from a
  * light. There is no lighting term, no shadow pass, no temporal accumulation
- * and no tonemapping in the P0 stub. That is a target choice, not a shortcut —
- * see METHODOLOGY.md. It removes the two things that most commonly break a
- * pixel gate (auto-exposure adaptation, TAA history) and the thing that most
- * commonly tanks frame rate (a cascaded shadow + AO + TAA stack).
+ * and no tonemapping. That is a target choice, not a shortcut — see
+ * METHODOLOGY.md. It removes the two things that most commonly break a pixel
+ * gate (auto-exposure adaptation, TAA history) and the thing that most commonly
+ * tanks frame rate (a cascaded shadow + AO + TAA stack).
+ *
+ * ART DIRECTION: TECHNICAL DRAFTING
+ * ---------------------------------
+ * The register is an engineering drawing, not an illustration. Three decisions
+ * carry it, and they are one system rather than three preferences:
+ *
+ *   GROUND. A cool near-white drafting paper, and the object sits ON it: the
+ *   top planes are LIGHTER than the paper, the two side planes DARKER. So the
+ *   figure separates from the field by value in both directions rather than by
+ *   hue, which is what lets the whole palette stay near-monochrome without the
+ *   image going flat.
+ *
+ *   DELINEATION. Every face carries an inked border, baked into the cell
+ *   geometry as real inset quads (`draftedBox`). It is not a wireframe pass, not
+ *   a post outline, and not a second material — it is the SAME vertex-coloured
+ *   triangles the fill is made of, in the same instanced draw call, compiled
+ *   into the same single program. Measured cost: 0 extra draw calls, 0 extra
+ *   programs, +48 triangles per cell. The line has real width in world units, so
+ *   it is a drawn line on a drawing rather than a screen-space effect, and it
+ *   scales with the plate the way ink on paper does.
+ *
+ *   ACCENT. Exactly one chromatic note, a drafting-red, and it is spent only on
+ *   the two things the player has to find: the avatar and the goal cell. Nothing
+ *   else in the scene is allowed to be a colour. That is the whole reason the
+ *   ground is near-monochrome — an accent is only restrained if it has no
+ *   competition.
+ *
+ * WHY THE INTERIOR LINES ARE HEAVIER THAN THE SILHOUETTE. Two coplanar
+ * neighbouring faces each contribute their own border to the joint between them,
+ * so a cell division reads at 2x edge width, while the outer silhouette gets one
+ * face's border and reads at 1x. A drafting convention would want the reverse.
+ * Getting it would cost an inverted-hull silhouette pass: a second draw call and
+ * (with a flipped winding or BackSide) very likely a second program, to fix a
+ * line-weight ratio. It is not worth the budget, and on a LIGHT ground it partly
+ * corrects itself — the silhouette also carries a large value step against the
+ * paper, while an interior joint separates grey from grey and needs the extra
+ * ink to be seen at all. Stated rather than hidden.
  */
 
-/** Stylised palette. Value separation carries the form, not lighting. */
+/**
+ * Drafting palette. Cool near-monochrome, one accent.
+ *
+ * `bg` sits deliberately BETWEEN faceTop and faceLeft in value, so the paper is
+ * darker than a lit top plane and lighter than any side plane.
+ */
 export const PALETTE = {
-  bg:        0x2a1b3d,
-  faceTop:   0xf2b880,
-  faceLeft:  0xd98e73,
-  faceRight: 0xa9678a,
-  accent:    0x6dd3c4,
+  bg:        0xe3e7ea,  // paper
+  faceTop:   0xf5f7f8,  // top planes, lighter than the paper
+  faceLeft:  0xbac3cb,  // +-z planes  (screen left)
+  faceRight: 0x99a4ae,  // +-x planes  (screen right)
+  ink:       0x1d2429,  // edge delineation
+  accent:    0xc6482f,  // reserved: player + goal, nothing else
 };
 
 /**
- * Paint vertex colours by face normal: up-facing gets the light tone, the two
- * horizontal axes get the mid and dark tones. This is what produces the
- * isometric three-tone read with zero lighting maths — and therefore with
+ * Width of the inked border, in world units, on a 1.0 cell.
+ *
+ * This is a DRAWN width, not a pixel width: it foreshortens and scales with the
+ * plate. At the hero plate (frustum ~7.7 over 1000px) it lands at ~1.4 px on the
+ * silhouette and ~2.8 px on a cell division, which is the hairline register the
+ * direction is after. Pushing it thinner makes the wide plate lose the line to
+ * sub-pixel coverage; pushing it thicker turns the cell divisions into stripes.
+ */
+export const EDGE_WIDTH = 0.011;
+
+/**
+ * The three-tone rule, stated once: up-facing gets the light tone, the two
+ * horizontal axes get the mid and dark tones. Zero lighting maths, and therefore
  * bit-identical output across runs.
  */
-export function paintByNormal(geometry, { top, left, right } = {}) {
-  const cTop   = new THREE.Color(top   ?? PALETTE.faceTop);
-  const cLeft  = new THREE.Color(left  ?? PALETTE.faceLeft);
-  const cRight = new THREE.Color(right ?? PALETTE.faceRight);
+export function faceTone(nx, ny, nz, { top, left, right }) {
+  return Math.abs(ny) > 0.5 ? top : Math.abs(nx) > 0.5 ? right : left;
+}
 
-  const normal = geometry.getAttribute('normal');
-  const colors = new Float32Array(normal.count * 3);
+/**
+ * The six faces of a unit cell, each as an outward normal and a right-handed
+ * tangent pair with `t1 x t2 === n`. Emitting a quad as
+ * (-t1,-t2) (+t1,-t2) (+t1,+t2) (-t1,+t2) is then counter-clockwise seen from
+ * outside, so the default FrontSide culling is correct on every face without a
+ * per-face special case.
+ */
+const FACES = [
+  { n: [1, 0, 0],  t1: [0, 0, -1], t2: [0, 1, 0] },
+  { n: [-1, 0, 0], t1: [0, 0, 1],  t2: [0, 1, 0] },
+  { n: [0, 1, 0],  t1: [1, 0, 0],  t2: [0, 0, -1] },
+  { n: [0, -1, 0], t1: [1, 0, 0],  t2: [0, 0, 1] },
+  { n: [0, 0, 1],  t1: [1, 0, 0],  t2: [0, 1, 0] },
+  { n: [0, 0, -1], t1: [-1, 0, 0], t2: [0, 1, 0] },
+];
 
-  for (let i = 0; i < normal.count; i++) {
-    const nx = normal.getX(i), ny = normal.getY(i), nz = normal.getZ(i);
-    const c = Math.abs(ny) > 0.5 ? cTop : Math.abs(nx) > 0.5 ? cRight : cLeft;
-    colors[i * 3 + 0] = c.r;
-    colors[i * 3 + 1] = c.g;
-    colors[i * 3 + 2] = c.b;
+/**
+ * A unit cell drawn as a technical figure: each face is an inset tone panel
+ * inside a frame of four ink rails.
+ *
+ * THE POINT OF DOING IT THIS WAY. The obvious way to get edge lines is a second
+ * mesh — `EdgesGeometry` + `LineSegments`, or an inverted hull. Either costs a
+ * draw call, and the line material costs a second shader program that compiles
+ * the first time it is drawn: exactly the lazily-compiled-shader stall
+ * ARCHITECTURE.md §6 exists to catch. Baking the lines into the cell geometry as
+ * ordinary vertex-coloured triangles costs neither. The panel and the rails do
+ * not overlap — the panel is the inset rectangle, the rails are the frame around
+ * it — so there is no coplanar geometry and no z-fighting to tune away.
+ *
+ * Faces between two adjacent cells are never seen: each is exactly occluded by
+ * the neighbour's own volume, and the neighbour's coincident back-face is culled.
+ *
+ * @returns {THREE.BufferGeometry} non-indexed, with position/normal/color.
+ */
+export function draftedBox({ size = 1, edge = EDGE_WIDTH, tones = PALETTE, ink } = {}) {
+  const h = size / 2;
+  // A rail wider than the half-cell would invert the panel. Clamped, not trusted.
+  const e = Math.min(Math.max(edge, 0), h * 0.5);
+
+  const cInk = new THREE.Color(ink ?? tones.ink ?? PALETTE.ink);
+  const palette = {
+    top:   new THREE.Color(tones.top   ?? tones.faceTop   ?? PALETTE.faceTop),
+    left:  new THREE.Color(tones.left  ?? tones.faceLeft  ?? PALETTE.faceLeft),
+    right: new THREE.Color(tones.right ?? tones.faceRight ?? PALETTE.faceRight),
+  };
+
+  const pos = [], nor = [], col = [];
+
+  for (const f of FACES) {
+    const tone = faceTone(f.n[0], f.n[1], f.n[2], palette);
+
+    const corner = (u, v) => [
+      f.n[0] * h + f.t1[0] * u + f.t2[0] * v,
+      f.n[1] * h + f.t1[1] * u + f.t2[1] * v,
+      f.n[2] * h + f.t1[2] * u + f.t2[2] * v,
+    ];
+    const quad = (u0, v0, u1, v1, c) => {
+      const a = corner(u0, v0), b = corner(u1, v0), d = corner(u1, v1), g = corner(u0, v1);
+      for (const p of [a, b, d, a, d, g]) {
+        pos.push(p[0], p[1], p[2]);
+        nor.push(f.n[0], f.n[1], f.n[2]);
+        col.push(c.r, c.g, c.b);
+      }
+    };
+
+    quad(-h + e, -h + e, h - e, h - e, tone);   // tone panel
+    quad(-h, -h, h, -h + e, cInk);              // rail: bottom
+    quad(-h, h - e, h, h, cInk);                // rail: top
+    quad(-h, -h + e, -h + e, h - e, cInk);      // rail: left
+    quad(h - e, -h + e, h, h - e, cInk);        // rail: right
   }
 
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return geometry;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nor), 3));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+  return g;
 }
 
 // =====================================================================
@@ -93,53 +209,87 @@ export function paintByNormal(geometry, { top, left, right } = {}) {
  *
  * WHERE THE DISCRETE SWAP HAPPENS: AT THE END. See the note on `_commit`.
  *
- * MEASURED: THE IDENTITY IS PIXEL-EXACT, AND TWO OTHER CONVENTIONS ARE NOT
+ * THE TONE CONVENTION — RESOLVED, AND THE NUMBERS THAT RESOLVED IT
  *
- * Captured at 800x500, `hero` shot, one +1 transition, comparing the last orbit
- * frame against the commit frame (tools/imagediff.mjs, strict):
+ * The history. Face tone is baked by world-facing direction, and src/world used
+ * to write TRANSLATION-ONLY instance matrices. A world turn therefore left tone
+ * fixed relative to the screen, while a camera orbit carried tone around with
+ * the geometry. Both are internally coherent conventions; they simply disagree,
+ * and the disagreement lands entirely on the frame the orbit commits.
  *
- *   world geometry, side tones made equal, avatar hidden ...  IDENTICAL, max 0
- *   world geometry as shipped, avatar hidden ..............  3.0987%, max 48
- *   as shipped, avatar visible ............................  3.3373%, max 228
+ * Measured HERE, 1600x1000, `hero`, one +1 transition, avatar visible, last
+ * orbit frame vs commit frame, tools/imagediff.mjs strict:
  *
- * Re-measured at integration, 1600x1000, same method, after src/player learned
- * to drop its view bias while `transitionState().active`:
+ *   BEFORE, translation-only instances .......  3.1891% changed, maxDelta 48
+ *   AFTER,  rigid-rotation instances .........  0%,             maxDelta 0
  *
- *   as shipped, avatar visible, bias dropped during orbit .  3.1891%, max 48
+ * (48 was exactly |faceLeft.r - faceRight.r| in the previous palette, i.e. the
+ * whole residual was the tone families exchanging sides and none of it was the
+ * avatar, silhouette, depth resolution or rasterisation.)
  *
- * maxDelta 228 -> 48 is the avatar residual going to zero: 48 is exactly
- * |faceLeft.r - faceRight.r|, so what remains is entirely residual 1 below.
+ * THE CHOICE: (A) LIGHT FIXED IN THE WORLD. src/world composes the exact
+ * quarter turn into the instance matrix, so a world turn is a true rigid
+ * rotation of a solid and its shading turns with it — which is what the camera
+ * orbit already assumed. Three reasons, in order of weight:
  *
- * So the camera-orbit == world-turn identity holds BIT-EXACTLY through the real
- * renderer — silhouette, depth resolution and rasterisation all agree. The whole
- * residual belongs to two conventions elsewhere that are only view-invariant at
- * the exact isometric angle, and both are named in the report:
+ *   1. IT IS WHAT THE DRAWING CLAIMS. The register here is a rigorous drawing of
+ *      a solid, and the whole tension of the piece is that the solid cannot
+ *      exist. The impossibility has to come from the PROJECTION and from nowhere
+ *      else. If the shading slides across the object's own faces as the object
+ *      turns, the object reads as a flat graphic being manipulated, and the
+ *      viewer stops crediting the drawing as a depiction of a solid before the
+ *      geometry ever gets a chance to lie to them. Spend the rigour on the
+ *      solid; spend the impossibility on the projection.
+ *   2. IT COSTS NOTHING. One line, no per-frame work, no repaint, no second
+ *      program, no extra draw call. Convention (B) held THROUGH the orbit needs
+ *      tone to be a function of the VIEW-space normal, which is either a
+ *      per-frame CPU repaint of the colour buffer for every orbit frame or a lit
+ *      material — and a lit material would also modulate the inked rails, so the
+ *      line weight of the drawing would change from face to face. That is not a
+ *      cost worth paying to keep a key light still.
+ *   3. THE PALETTE PAYS DOWN ITS COST. (A)'s stated cost is that the apparent
+ *      key-light direction differs between rotation states. Measured, same
+ *      method, capturing rot1/rot2/rot3 under (A) and under (B) and diffing:
  *
- *   1. FACE TONES (3.0987%, max 48 — exactly |faceLeft.r - faceRight.r|).
- *      paintByNormal bakes tone onto WORLD-space normals, and src/world's
- *      _applyRotation only translates its instances. A world turn therefore
- *      leaves the tone-to-screen-side mapping fixed, while a 90 deg camera orbit
- *      exchanges the +-x and +-z families. Fix (src/world, one line): compose
- *      makeRotationY(turns * PI/2) into the instance matrix so tone rotates with
- *      the cell. That makes a world turn a true rigid rotation and the swap
- *      exactly pixel-clean — it is an intentional art change and needs a
- *      deliberate reference re-capture (ARCHITECTURE.md §5).
- *   2. AVATAR VIEW BIAS (0.24%, max 228) — FIXED AT INTEGRATION, in src/player.
- *      src/player pushed the avatar t steps along world (1,1,1) to win the depth
- *      test; that is a screen no-op only on-axis, so off-axis it read as a
- *      diagonal displacement and snapped back at the commit. src/player now
- *      polls `ctx.peek('render').transitionState().active` and takes a bias of 0
- *      for the duration of an orbit, restoring it when the camera arrives. Cost,
- *      measured: at loop-01's start cell the avatar is honestly occluded for the
- *      first 6 frames of the orbit (100 ms) before the camera separates it from
- *      the walkway; at the other 9 standable cells the bias was already 0 and
- *      nothing changes. The commit frame no longer moves it at all — centroid
- *      843.7, 431.5 on both sides of the swap.
+ *        rot1 ...  6.9134% changed, maxDelta 58
+ *        rot2 ...  0%,              maxDelta 0
+ *        rot3 ...  7.0716% changed, maxDelta 54
  *
- * Residual 1 is not fixable from src/render, and neither residual is a reason to
- * move the swap:
- * once (1) lands, the end-swap is provably clean, which the control above
- * already demonstrates.
+ *      Three things that says. Rotation 2 is FREE — a half turn maps +-x onto
+ *      -+x and +-z onto -+z, so the tone families are preserved and the two
+ *      conventions are bit-identical there. Only the odd states differ, and what
+ *      differs is exactly the mid and dark side values exchanging sides: mean
+ *      delta over the whole frame is 2.19, and 2.19/0.069 = 31.7 per changed
+ *      pixel, against a faceLeft/faceRight step of 33/31/29 per channel. The
+ *      maxDelta of 54-58 is 10 pixels out of 1.6 million, all of them
+ *      antialiased ink/paper edge blends resolved in linear space. So the cost
+ *      is a 12% value step swapping sides on two of four views — real, visible
+ *      if you A/B it, and far below the threshold at which the drawing stops
+ *      reading, because in this palette the form is carried by the inked
+ *      delineation and by the top-vs-side value break, not by left-vs-right.
+ *      A high-chroma or high-contrast side pair would have made (A) expensive.
+ *      That is the coupling: the palette choice is what makes the tone-convention
+ *      choice affordable, which is why they are one decision and not three.
+ *
+ * WHAT (A) COSTS THE AVATAR, AND WHAT WAS DONE ABOUT IT. The pawn is not carried
+ * by the world turn, so under (A) a pawn with two distinct side values would be
+ * lit from the opposite side to the cells around it in the odd rotation states.
+ * Its two side tones are therefore EQUAL (src/player), which makes it
+ * rotation-invariant and reads correctly for what it is — the marker on the
+ * drawing, not another solid. Stated as a cost because it is one: the pawn has
+ * two values where everything else has three.
+ *
+ * THE AVATAR VIEW BIAS residual (0.24%, max 228) was fixed earlier, in
+ * src/player: it pushed the avatar t steps along world (1,1,1) to win the depth
+ * test, which is a screen no-op only on-axis, so off-axis it read as a diagonal
+ * displacement and snapped back at the commit. src/player now polls
+ * `ctx.peek('render').transitionState().active` and takes a bias of 0 for the
+ * duration of an orbit. Cost, measured: at loop-01's start cell the avatar is
+ * honestly occluded for the first 6 frames of the orbit (100 ms); at the other 9
+ * standable cells the bias was already 0 and nothing changes.
+ *
+ * With both resolved, the end-swap is not merely defensible, it is INVISIBLE:
+ * changedPct 0, maxDelta 0 on the frame the illusion resolves.
  */
 
 /** One quarter turn. */

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { paintByNormal, PALETTE } from '../render/index.js';
+import { draftedBox, PALETTE } from '../render/index.js';
 import { Structure, rotateY, cellId } from '../geometry/index.js';
 import { LEVELS, DEFAULT_LEVEL } from './levels.js';
 
@@ -24,7 +24,10 @@ export default {
     this.structure = new Structure(this.level.cells);
     this.turns = 0;
 
-    const box = paintByNormal(new THREE.BoxGeometry(CELL, CELL, CELL));
+    // The cell kit. Tone panels and inked rails are one geometry, so the
+    // delineation costs no second mesh, no second material and no second shader
+    // program — see draftedBox in src/render.
+    const box = draftedBox({ size: CELL });
     const material = new THREE.MeshBasicMaterial({ vertexColors: true });
 
     this.mesh = new THREE.InstancedMesh(box, material, this.level.cells.length);
@@ -52,21 +55,57 @@ export default {
    * whole model is integer lattice positions, and interpolating between them
    * would put cells at non-integer coordinates where the screen-position
    * invariant does not hold. Animating the CAMERA between the four states is
-   * the correct way to make this feel continuous, and belongs to P2.
+   * the correct way to make this feel continuous, and src/render does.
+   *
+   * THE INSTANCE TRANSFORM IS A RIGID ROTATION, NOT A TRANSLATION. This is the
+   * tone convention (A) decision — light fixed in the WORLD — and it is the one
+   * line that resolves the swap on the rotation commit frame.
+   *
+   * Face tone is baked onto the cell's vertices by world-facing direction. If
+   * the instance transform only translated, a world turn would move the cell but
+   * leave its tones pointing at the same screen sides, while src/render's camera
+   * orbit carries tone around with the geometry — the two disagree, and the
+   * disagreement lands entirely on the frame the orbit commits (measured before
+   * this change: 3.1891% of pixels, maxDelta 48 = |faceLeft.r - faceRight.r|).
+   * Composing the quarter turn in makes a world turn a TRUE rigid rotation of a
+   * solid: the object turns and its shading turns with it, exactly as the orbit
+   * already assumed. The commit frame then agrees by construction, not by tuning.
+   *
+   * The rotation is written from exact integers rather than from
+   * Matrix4.makeRotationY(turns * PI/2), whose cos(PI/2) is 6.1e-17 rather than
+   * 0. The lattice is integer everywhere else; the transform that carries it has
+   * no business introducing the project's first epsilon.
    */
   _applyRotation() {
     const m = new THREE.Matrix4();
-    const startId = cellId(...this.level.start);
+    /**
+     * THE ACCENT IS SPENT ON THE GOAL AND NOTHING ELSE.
+     *
+     * The start cell used to be tinted too. On a near-monochrome sheet with one
+     * chromatic note, that put a second red mass on the plate — and a redundant
+     * one, because the player's own marker is already standing on the start cell
+     * in the same colour. Two adjacent red blocks at the figure's left tip read
+     * as an area of colour rather than as an annotation. One cell, one pawn.
+     */
     const goalId = cellId(...this.level.goal);
     const accent = new THREE.Color(PALETTE.accent);
 
+    // Ry(t * 90deg), exactly. Matches src/geometry's rotateY: (x,y,z) -> (z,y,-x).
+    const t = this.turns;
+    const C = [1, 0, -1, 0][t];
+    const S = [0, 1, 0, -1][t];
+
     this.level.cells.forEach((cell, i) => {
       const [x, y, z] = rotateY(cell, this.turns);
-      m.makeTranslation(x * CELL, y * CELL, z * CELL);
+      m.set(
+        C, 0, S, x * CELL,
+        0, 1, 0, y * CELL,
+        -S, 0, C, z * CELL,
+        0, 0, 0, 1,
+      );
       this.mesh.setMatrixAt(i, m);
 
-      const id = cellId(...cell);
-      const tint = (id === startId || id === goalId) ? accent : null;
+      const tint = cellId(...cell) === goalId ? accent : null;
       this.mesh.instanceColor.setXYZ(i, tint ? tint.r : 1, tint ? tint.g : 1, tint ? tint.b : 1);
     });
 
