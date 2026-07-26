@@ -65,84 +65,80 @@ function probe01() {
 }
 
 /**
- * ledge-01 — the level that teaches the turn.
+ * A tribar of side n, the same closed figure loop-01 builds.
  *
- * A walkway you can see the whole of, and a tower whose top is not reachable
- * from it. Walking runs out after two steps; the only thing left to try is Q or
- * E, and one quarter turn brings the tower top into reach.
- *
- * This is the first level in the project where the goal cannot be reached in
- * the rotation the level opens in — loop-01 and probe-01 are both solvable in
- * one move without ever turning, which is why they declare turn: false.
+ * Three legs along +x, +y and +z with net displacement (n,n,n). Because that
+ * net is a multiple of the view direction, the far end aliases the near end on
+ * screen and the loop reads as closed — which is the whole reason it looks
+ * impossible. Shared by the three levels below so the figure is defined once.
  */
-function ledge01() {
+function tribar(n) {
   const cells = [];
-  for (let i = 0; i <= 4; i++) cells.push([i, 0, 0]);   // ground walkway
-  for (let j = 0; j <= 2; j++) cells.push([0, j, 1]);   // the tower
+  for (let i = 0; i <= n; i++) cells.push([i, 0, 0]);
+  for (let j = 1; j <= n; j++) cells.push([n, j, 0]);
+  for (let k = 1; k <= n; k++) cells.push([n, n, k]);
+  return cells;
+}
+
+/**
+ * spur-01 — the level that teaches the turn.
+ *
+ * A small tribar with a detached spur. Walking the figure never reaches the
+ * spur; one quarter turn brings it into reach. This is the first level in the
+ * project whose goal cannot be reached in the rotation it opens in — loop-01
+ * and probe-01 are both solvable in one move without turning, which is why
+ * they declare turn: false.
+ */
+function spur01() {
   return {
-    name: 'ledge-01',
-    cells,
-    start: [0, 0, 0],
-    goal: [0, 2, 1],
-    premise: { turn: true, illusion: true, minWalks: 3, minTurns: 1, openWithWalk: true },
+    name: 'spur-01',
+    cells: [...tribar(3), [1, 0, 3], [2, 0, 3], [3, 0, 3]],
+    start: [1, 0, 0],
+    goal: [3, 0, 3],
+    premise: { turn: true, illusion: true, minWalks: 7, minTurns: 1, openWithWalk: true },
   };
 }
 
 /**
- * ascent-02 — walking and turning interleave.
+ * span-02 — two turns, on a larger figure.
  *
- * No single rotation contains a complete path: the tower is reachable from the
- * ground only at one turn, and the upper walkway only from the tower at
- * another. The route is walk, turn, walk, turn, walk.
+ * No single rotation contains a complete path, so walking and turning have to
+ * interleave rather than the player turning once and walking home.
  */
-function ascent02() {
-  const cells = [];
-  for (let i = 0; i <= 4; i++) cells.push([i, 0, 0]);   // ground walkway
-  for (let j = 0; j <= 2; j++) cells.push([0, j, 1]);   // the tower
-  for (let i = 0; i <= 2; i++) cells.push([i, 3, 0]);   // upper walkway
+function span02() {
   return {
-    name: 'ascent-02',
-    cells,
-    start: [0, 0, 0],
-    goal: [2, 3, 0],
-    premise: { turn: true, illusion: true, minWalks: 5, minTurns: 2, openWithWalk: true },
+    name: 'span-02',
+    cells: [...tribar(4), [0, 0, 3], [1, 0, 3], [2, 0, 3]],
+    start: [1, 0, 0],
+    goal: [2, 0, 3],
+    premise: { turn: true, illusion: true, minWalks: 8, minTurns: 2, openWithWalk: true },
   };
 }
 
 /**
- * tiers-03 — three turns, and occlusion carrying the puzzle.
+ * shelf-03 — three turns, with the goal built into the figure.
  *
- * Three parallel walkways at different heights and depths. Two of them are
- * crossed only by an illusion edge, and the standable count swings from 12 at
- * turns 0 and 1 to 7 at turn 2 — rotating genuinely creates and destroys
- * ground here, rather than merely rewiring which platforms connect.
- *
- * NEGATIVE COORDINATES ARE DELIBERATE. rotateY pivots at the world ORIGIN, so
- * a level cannot be translated without changing what rotation does to it — the
- * screen keys, and therefore the whole premise, would move. Straddling the
- * origin also keeps the structure nearer the orbit pivot than loop-01's corner
- * does, so it swings less at mid-orbit.
+ * A full-size tribar carrying a shelf on its standing leg. The shelf reads as
+ * part of the structure rather than as a separate object, so the level looks
+ * like one impossible solid and the route through it is the least obvious of
+ * the three.
  */
-function tiers03() {
-  const cells = [];
-  for (let i = 0; i <= 4; i++) cells.push([i, 0, 0]);        // lower walkway
-  for (let i = -2; i <= 1; i++) cells.push([i, 1, -1]);      // middle walkway
-  for (let i = -1; i <= 1; i++) cells.push([i, -1, 1]);      // upper-rear walkway
+function shelf03() {
   return {
-    name: 'tiers-03',
-    cells,
-    start: [0, 0, 0],
-    goal: [1, -1, 1],
-    premise: { turn: true, illusion: true, minWalks: 7, minTurns: 3, openWithWalk: true },
+    name: 'shelf-03',
+    cells: [...tribar(5), [6, 4, 0], [6, 4, 1]],
+    start: [1, 0, 0],
+    goal: [6, 4, 1],
+    premise: { turn: true, illusion: true, minWalks: 8, minTurns: 3, openWithWalk: true },
   };
 }
 
 export const LEVELS = {
   'loop-01': loop01(),
   'probe-01': probe01(),
-  'ledge-01': ledge01(),
-  'ascent-02': ascent02(),
-  'tiers-03': tiers03(),
+  'spur-01': spur01(),
+  'span-02': span02(),
+  'shelf-03': shelf03(),
 };
 
 export const DEFAULT_LEVEL = 'loop-01';
