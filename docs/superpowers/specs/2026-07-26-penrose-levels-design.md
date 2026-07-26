@@ -57,6 +57,11 @@ prevent, since geometry is meant to be the single authority the player reads.
 the state every level opens in. If a flat path exists there, no turn is needed,
 whatever the other three rotations do.
 
+`solvability().requiresRotation` keeps its current meaning and its current name,
+but `analyze.mjs` must stop reporting it unqualified — it reads as "the player
+must rotate" and means "some rotations work and some do not", which is how this
+gap survived. The report labels it, or drops it in favour of `requiresTurn`.
+
 ### Open decision, stated rather than buried
 
 BFS costs a turn and a walk equally. Both are one keypress, which is the honest
@@ -74,6 +79,23 @@ claims to be, and CI proves the claim:
 ```js
 premise: { turn: true, illusion: true, minWalks: 3, openWithWalk: true }
 ```
+
+| field | proven against |
+|---|---|
+| `turn` | `requiresTurn` — declared value must **equal** measured, not merely imply it |
+| `illusion` | `usesIllusion` — likewise an equality |
+| `minWalks` | `walksInRoute >= minWalks`; omitted means no bound |
+| `openWithWalk` | `route[0].kind === 'walk'`; omitted means no constraint |
+
+`turn` and `illusion` are equalities in **both** directions deliberately. If
+`turn: false` merely meant "no constraint", a level could quietly acquire a
+turn-requiring route through an unrelated edit and nothing would say so — which
+is the same silent-drift failure this spec exists to close. A level that changes
+character must fail until someone re-declares what it now is.
+
+Edge case: if `start` equals `goal` the route is empty, `usesIllusion` is false
+and `openWithWalk` cannot hold. Such a level is rejected outright rather than
+special-cased.
 
 A single global "every level must require a turn" assert was rejected: it would
 fail `loop-01` and `probe-01`, which genuinely do not require one. Declaring the
@@ -150,7 +172,22 @@ pixels must not move.** That is the acceptance test for this change. It lands an
 is gated *alone*, before any new level exists, so a reference shift can only be
 attributed to the harness.
 
-Then three new plate shots, one per level: 9 → 12.
+Then three new plate shots, one per level: 9 → 12. Each frames its level at
+turn 0, the state it opens in — which `openWithWalk` guarantees is a playable
+state rather than a stuck one.
+
+**`DEFAULT_LEVEL` stays `loop-01`.** It is what every existing shot captures, so
+changing it would move all nine references at once and confound this change with
+a content change.
+
+Predicted cost: the gate is ~3m30s for 9 shots captured twice, so ~12s per
+capture and ~23s of CI per added shot — about **+70s**, taking the gate to
+roughly 4m40s against a 30-minute timeout. That figure is derived from two
+numbers in the handoff, not measured, and §6 requires measuring it. New levels
+also add cells, hence instances and triangles; the paper bake left the scene at
+402 triangles per frame, so the headroom is large, but the 20× regression that
+forced the timeout to 30 minutes came from exactly this class of change going
+unmeasured.
 
 ## 5. Tests and CI
 
