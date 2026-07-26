@@ -666,6 +666,142 @@ measurable at all; it is inert when unset, verified by the gate reporting
 
 ---
 
+## P6 — motion coverage
+
+**Completed 2026-07-26.** The gate now covers three frames captured mid-flight.
+
+### What was ungated
+
+All 12 gated shots were **static states**: a shot put the world somewhere and the
+harness pumped a fixed 90 frames, by which time nothing was moving. So the camera
+orbit, the avatar's step interpolation, and the avatar's bias-drop during an orbit
+were covered by unit tests and ad-hoc probes only.
+
+That was tolerable while rotation was decorative. P5 made it load-bearing in three
+levels, which turned the orbit into the most-exercised interaction in the game and
+the largest thing the gate could not see.
+
+### Determinism was never the blocker
+
+`tools/commitframe.mjs` had already been driving motion reproducibly since P2: it
+emits `world/rotate-request`, pumps an exact number of frames, and derives the orbit
+length from the engine rather than assuming it.
+
+The blocker was the **shot contract** — "a shot may not start an animation" — and
+that rule turns out to be about *legibility*, not determinism. Motion under lockstep
+is perfectly reproducible; a shot that starts an animation simply stops describing a
+*state* and starts describing a state **plus a frame count**. So the rule became: a
+shot may start an animation **if it declares the `settle` it needs**, which makes the
+frame count part of what the shot describes. Symmetric with the `level` declaration
+added in P5, and it reuses the same discovery machinery.
+
+### The assertion that stops this being theatre
+
+The failure mode for this whole change is a motion shot that silently captures a
+**settled** frame. It would be perfectly reproducible, pass the gate forever, and
+cover nothing — the same shape as any green result that measured something other
+than what it claimed.
+
+So `tools/baseline.mjs` **refuses** any shot that declared a `settle` and is not in
+motion at the shutter, reading `render.info().orbiting` and `player.motionState()`.
+
+*Guard verified to fail:* declaring `settle: 14` on the static `wide` shot gives
+exit 1, `ok: false`, `"declared settle 14 but nothing was in motion at the shutter"`,
+with `motion { orbiting: false, moving: false }`.
+
+### Measured, not computed — again
+
+| | frames | `ceil(seconds / fixedDt)` |
+|---|---|---|
+| orbit, request → commit | **28** | 27 — **wrong** |
+| step, `step()` → settled | **14** | 14 |
+
+`src/render/camera.test.js` derives 27 from the same constants *in isolation*; the
+extra frame appears only when the whole engine is driven. A spec that trusted the
+arithmetic would have captured the frame **before** the commit and called it the
+commit — and the gate would have passed on it forever.
+
+This is why `orbitlate` sits at 27, the last frame still in flight, and why there is
+deliberately **no commit-frame shot**: at 28 the orbit is inactive, so such a shot
+reports `orbiting: false` and the harness rejects it. The committed state is already
+covered statically by `rot1`, and the delta across the commit is what
+`commitframe.mjs` exists to measure.
+
+`test/motion-frames.test.js` pins the measured **counts**, not just the constants,
+by driving the player through a harness. *Guards verified to fail:* `ORBIT_SECONDS`
+0.45 → 0.5 fails the orbit pin; `MOVE_SECONDS` 0.22 → 0.3 fails with "the step settle
+count changed".
+
+### A framing error the numbers could not catch
+
+The orbit shots were first framed on the structure at turn 0. Every automated check
+passed — the capture reported `orbiting: true`, the gate was identical. **Looking at
+the render showed a third of the structure swinging out of frame**, because the camera
+rotates 90° about the world origin during an orbit and the frustum had been solved for
+the on-axis view.
+
+Anything out of frame is not gated, so the shot was covering less than it claimed.
+Fixed by framing the **union** of where the cells sit at turn 0 and turn 1 — the two
+ends of the swing, which the orbit-equals-turn identity makes equivalent. The subject
+is smaller; completeness matters more than scale for a gate shot.
+
+Third time in this project that looking at the image caught what the numbers could
+not, after the black `vertexColors` material and the three visually-meaningless levels
+in P5.
+
+### Cost, and an arithmetic error in the spec
+
+Measured under `PENROSE_GL=swiftshader`, which is what CI rasterises with:
+
+| | wall clock |
+|---|---|
+| 12 shots | 18.820 s |
+| 15 shots | 21.255 s |
+| marginal, 3 shots | **2.435 s** (~0.81 s/shot) |
+| projected gate delta (captures twice) | **≈ 4.9 s** |
+
+The spec predicted "≈ +2.8 s", and that number was **arithmetically wrong**: it
+doubled the per-shot rate for the gate's two captures but dropped the count of three
+shots. The correct prediction from the static rate would have been ≈ 8.4 s.
+
+The measurement is *below* even the corrected figure, because motion shots pump 7, 14
+and 27 frames rather than the default 90 — a motion shot is **cheaper** than a static
+one. Two estimates in a row have now been wrong in this repository, in opposite
+directions. Measure.
+
+### What this widens, deliberately
+
+**The gate now depends on animation timing.** Every other shot is a static state;
+these three are a state plus a clock. Any future change to easing, `HOP`,
+`MOVE_SECONDS` or the orbit curve will move pixels in a gated shot.
+
+That is the coverage being bought, not a defect — but it means a red gate after an
+animation change is **expected**, and the correct response is a deliberate reference
+re-capture as a reviewed commit (`ARCHITECTURE.md` §5), never a widened tolerance.
+
+### Verification
+
+| check | result |
+|---|---|
+| `npm test` | 146 pass, 0 fail |
+| motion assertion | verified to fail on a static shot |
+| frame-count pins | both verified to fail |
+| existing 12 references after the harness change | `maxDelta: 0`, all rows |
+| `npm run gate` | `identical: true` across 15 shots |
+
+The last row is the real result: motion reproduces frame-for-frame across two
+independent captures.
+
+### Still open
+
+- The orbit shots frame the union of both swing ends, so the subject is small. A
+  tighter frame that still contains the whole swing would need `frameCells` to solve
+  against a camera path rather than a static direction.
+- Only `+1` orbits are covered. A `-1` orbit uses the same code with the opposite
+  sign, which `camera.test.js` covers in unit form but no shot captures.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
