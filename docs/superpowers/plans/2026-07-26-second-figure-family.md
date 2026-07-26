@@ -538,7 +538,7 @@ Write the chosen figures, spurs, start/goal pairs and measured premises into the
 **Files:**
 - Modify: `src/world/levels.js`
 
-- [ ] **Step 1: Write the failing test first — by adding the levels**
+- [x] **Step 1: Write the failing test first — by adding the levels**
 
 `src/world/levels.test.js` already loops over every entry in `LEVELS` and proves the declared premise against measured geometry. Adding a level with a wrong declaration therefore fails automatically; there is no separate test to write.
 
@@ -546,7 +546,7 @@ Add each level as a function beside `shelf03()`, following the existing shape �
 
 Declare `minTurns` at the **measured** `turnsInRoute`, per spec §5.1.
 
-- [ ] **Step 2: Register them and extend the campaign**
+- [x] **Step 2: Register them and extend the campaign**
 
 ```js
 export const LEVELS = {
@@ -563,7 +563,7 @@ export const ORDER = ['loop-01', 'spur-01', 'span-02', 'shelf-03', /* three new 
 
 `DEFAULT_LEVEL` stays `loop-01`. All 15 existing shots capture it.
 
-- [ ] **Step 3: Prove each level with the analyser**
+- [x] **Step 3: Prove each level with the analyser**
 
 ```bash
 for lv in loop-01 probe-01 spur-01 span-02 shelf-03 <new-1> <new-2> <new-3>; do
@@ -573,7 +573,7 @@ done
 
 Expected: no `FAILED` lines. `analyze.mjs` exits 1 on any declared-vs-measured mismatch.
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 ```bash
 npm test
@@ -581,7 +581,7 @@ npm test
 
 Expected: 172 + 3 new premise tests per level (`declares a premise`, `start is not the goal`, `the declared premise is what the geometry measures`) = **181 pass, 0 fail**. The campaign curve test at `campaign.test.js:39` must pass — if it reports "the curve goes backwards", the `minTurns` ordering in `ORDER` is wrong.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/world/levels.js
