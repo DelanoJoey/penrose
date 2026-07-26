@@ -489,6 +489,183 @@ re-capture as a reviewed act instead of quietly widening `--tol`.
 
 ---
 
+## P5 — making rotation load-bearing
+
+**Completed 2026-07-26.** Three levels, and the routing model that made them
+possible to check.
+
+### The mechanic was asserted by CI and load-bearing in nothing
+
+`loop-01` is solvable in one move without ever rotating:
+
+```
+$ node tools/analyze.mjs loop-01
+"solvableTurns": [0]
+"pathUnrotated": ["1,0,0", "5,5,5"]
+```
+
+Two nodes is one step, taken in the state the level opens in. `probe-01` is the
+same. The mechanic this project is named for had never been required to solve
+anything.
+
+The analyser could not have said so. `findPath(from, to, turns)` searches
+`pathGraph(t)` for one fixed `t`; `solvability()` runs it four times
+independently. So `requiresRotation` means *"some rotations work and some do
+not"* — and reads as *"the player must rotate"*. That phrasing is the entire
+reason this survived a whole phase, which is why the field is now reported as
+`someRotationsFail` and `requiresTurn` answers the real question.
+
+`findRoute` searches `(cell, turns)`, where walking uses `pathGraph(t)` and
+turning is a move.
+
+### The obvious turn rule was wrong
+
+The intuitive rule is that a turn should be legal only when the cell is
+standable in **both** rotations, so the player cannot strand themselves. The
+game disagrees. `world.setRotation` has no standability check, and
+`src/player/index.js:366` says it out loud: *"If the current cell is not
+standable in this rotation it has no entry, and every direction is blocked —
+which is correct: rotate back to get out."* A route may pass **through** a
+rotation in which its cell is not a platform.
+
+An analyser using the stricter rule would disagree with the player about what
+the level is, which is the failure `ARCHITECTURE.md` §3 exists to prevent.
+
+`loop-01` supplies the negative control without needing a fixture built for it:
+at turn 0, `(5,5,5)` aliases `(0,0,0)` and sits in front of it, so `(0,0,0)` is
+standable at turns 1, 2 and 3 but **not** at turn 0. Routing from there at turn
+0 returns 4 moves opening with a turn; under the stricter rule it returns null.
+
+**The guard was verified to fail.** Patching the turn edge to require
+standability in both rotations produces 8 pass / 1 fail, and the one failure is
+exactly that test.
+
+One coverage limit, stated rather than left implicit: a *different* wrong rule —
+requiring standability only at the **destination** rotation — passes all nine
+tests. Catching it needs a cell standable at `t` and `t+2` but not at `t+1` or
+`t+3`. A search over 5,915 two-leg structures found **zero** such shapes, so the
+gap is unreachable rather than merely uncaught, and no test was written against
+a fixture that does not exist.
+
+### Levels declare their premise; CI proves it
+
+A global "every level must require a turn" assert would fail `loop-01` and
+`probe-01`, which honestly do not. Each level now declares
+`{ turn, illusion, minWalks, minTurns, openWithWalk }` and `tools/analyze.mjs`
+proves the declaration, with `turn` and `illusion` as equalities in **both**
+directions — if `turn: false` merely meant "no constraint", a level could
+quietly acquire a turn-requiring route with nothing to say so.
+
+Guard verified to fail: declaring `turn: true` on `loop-01` exits 1 with
+`declares turn: true but measured requiresTurn: false`.
+
+`minTurns` was added after the fact, because `turn: true` only asserts that
+*some* turn is needed and `shelf-03`'s premise is specifically three.
+
+### The first three levels passed every assert and were wrong
+
+`ledge-01`, `ascent-02` and `tiers-03` satisfied the routing premise — no flat
+solution in any rotation, two to three turns, illusion edges load-bearing — and
+were rejected on sight. They rendered as a tower beside a road, a bracket, and
+three floating bars.
+
+**An impossible figure requires a closed circuit.** `loop-01` reads as a tribar
+because its legs close on screen: net displacement `(n,n,n)` is a multiple of
+the view direction, so the far end aliases the near end. All three rejected
+levels were *open* paths — walkway, tower, walkway — and no routing premise can
+make an open path read as impossible.
+
+This is the second time in this project a level has been algebraically correct
+and visually meaningless, and the first time the analyser could not catch it:
+`analyze.mjs` proves a level's **routing**, never its picture. The check that
+caught it was looking at the render.
+
+The replacements keep a tribar closed and hang the goal off it:
+
+| level | figure | turns | walks | illusion walks | cells |
+|---|---|---|---|---|---|
+| `spur-01` | tribar(3) + detached spur | 1 | 7 | 2 | 13 |
+| `span-02` | tribar(4) + detached span | 2 | 8 | 2 | 16 |
+| `shelf-03` | tribar(5) + integrated shelf | 3 | 8 | 2 | 18 |
+
+All three have `flatSolvableTurns: []` — no single rotation contains a complete
+path — and all open with a walk, so the level is playable on frame one and the
+turn-0 plate is not a picture of a stuck state. That constraint came from the
+search rather than from taste: most layouts satisfying the strong premise open
+with a turn.
+
+Feasibility was measured before any of this was specified: 797 two-leg layouts
+requiring a turn, and 19,021 three-leg layouts with no flat solution in any
+rotation. The search is a filter, never the author — those hits are
+geometrically valid and visually arbitrary, which is exactly how the first three
+levels happened.
+
+### A harness bug that made a passing gate meaningless
+
+`tools/baseline.mjs` skipped spawning a dev server whenever the port was already
+open. A vite process from a **different worktree** (`/Users/jelstner/penrose`,
+port 5199) therefore served every capture, and an entire before/after comparison
+ran against code containing none of the branch's changes — reporting
+`maxDelta: 0`, which looked like a pass and proved nothing.
+
+Re-verified properly, with a real worktree checked out at the pre-change commit
+and two fresh ports: `identical: true`, 0 of 9 rows moved. The conclusion held;
+the original evidence for it was worthless.
+
+The harness now scans for a free port and always spawns its own, announcing the
+move. Deliberately not an error: `gate.mjs` runs `baseline.mjs` twice on the
+same port and a lingering socket must not fail the second run.
+
+This is the third time in this project a number looked fine and meant nothing —
+after the fps figure that measures rAF dispatch overhead, and the structural
+budget that held exactly through a 20× wall-clock regression. All three share a
+shape: **a measurement taken under conditions the target does not share.**
+
+### The CI cost estimate was 8× too high
+
+The spec predicted roughly **+70 s** of CI for 9 → 12 shots. Measured under
+`PENROSE_GL=swiftshader`, which is what CI actually rasterises with:
+
+| | wall clock |
+|---|---|
+| 9 shots | 14.620 s |
+| 12 shots | 18.872 s |
+| marginal, 3 shots | **4.252 s** (~1.4 s/shot) |
+| projected gate delta (captures twice) | **≈8.5 s** |
+
+The prediction divided total historic gate wall-clock by total shot-captures,
+which treats fixed per-invocation cost — vite start, browser launch, the
+discovery probe — as if it scaled per shot. It does not, and it cancels out of a
+delta. Stated here rather than corrected in the spec, so the record of what was
+believed when still reads straight.
+
+`PENROSE_GL=swiftshader` was added to `tools/_browser.mjs` to make this
+measurable at all; it is inert when unset, verified by the gate reporting
+`identical: true` with it absent.
+
+### Verification
+
+| check | result |
+|---|---|
+| `npm test` | 141 pass, 0 fail |
+| `analyze` × 5 levels | all exit 0 |
+| guard: turn-edge rule | verified to fail (8/1) |
+| guard: premise declaration | verified to fail (exit 1) |
+| `npm run gate` | `identical: true`, 12 shots |
+| existing 9 references after harness change | `maxDelta: 0`, re-verified on fresh ports |
+
+### Still open
+
+- No pixel coverage of anything in motion. Unchanged from P4 — shots may not
+  start animations, so a step in flight and a mid-orbit camera are still covered
+  by unit tests and ad-hoc probes only.
+- The route BFS costs a turn and a walk equally, both being one keypress. No
+  evidence yet says what a better weighting would be.
+- `spur-01` and `span-02` are the same composition at two scales — a tribar with
+  a detached bar. Only `shelf-03` integrates its goal into the figure.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
