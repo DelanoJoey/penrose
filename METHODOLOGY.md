@@ -328,6 +328,109 @@ was believed when still reads straight:
 
 ---
 
+## P3 — the art pass, run as a judge panel
+
+**Completed 2026-07-26.** Three complete art directions built independently in
+isolated git worktrees, then scored by three single-lens judges, then a human
+picked the winner from the rendered images.
+
+### Why a panel and not a single owner
+
+`ARCHITECTURE.md` §3.4 says coupled systems get one sequential owner. Palette,
+tone convention and composition *are* one coupled system — which is the argument
+for each agent owning **all three**, independently, rather than for splitting
+them across agents. Three complete attempts is not the fan-out the rule forbids;
+three agents each holding one third of a palette would have been.
+
+The directions were **riso** (limited-ink print), **dusk** (twilight monument)
+and **draft** (technical drafting). Judges scored craft / premise / rigor, with
+"premise" defined as *does this serve the illusion* — an art direction that makes
+the trick obvious has failed however attractive it is.
+
+| direction | craft | premise | rigor | weighted |
+|---|---|---|---|---|
+| **riso** | 8.5 | 9 | 6 | **8.3** |
+| draft | 6 | 6 | 8 | 6.4 |
+| dusk | 8 | 3 | 9 | 5.95 |
+
+### The finding that decided it
+
+**dusk lost on its own strength.** It was the best-measured of the three and
+produced the most beautiful individual frames in the set — and its central idea,
+atmospheric recession keyed to lattice depth, is self-defeating here. A Penrose
+figure works *only* if the eye cannot tell which leg is far. Any depth cue makes
+the impossible edge visibly cross fourteen units of atmosphere in one step, so
+the trick becomes **more** legible, not less. Its own report said so out loud.
+
+riso won because it is the only direction that supplies zero depth information
+anywhere: flat limited-ink planes, no gradient, no lighting term at all.
+
+This is the generalisable result. **The constraint that decides an art direction
+here is not aesthetic, it is informational** — the illusion requires the render to
+withhold depth, so any technique that adds depth cueing is disqualified no matter
+how well executed.
+
+### The tone convention, settled
+
+All three directions independently chose **light fixed in the world**, and each
+drove the commit-frame delta to zero through a separately written harness. The
+before-figure was re-measured a fourth time on the merge branch:
+
+| | changedPct | maxDelta | meanDelta | identical |
+|---|---|---|---|---|
+| before | 3.1891 | 48 | 1.433 | false |
+| after | **0** | **0** | **0** | **true** |
+
+`maxDelta 48` is exactly `|faceLeft.r − faceRight.r| = |0xd9 − 0xa9|`, so the
+entire residual was provably the tone convention and nothing else.
+
+`paintByNormal` bakes tone onto world-space normals while `_applyRotation` wrote
+translation-only matrices, so a world turn kept tone screen-fixed while a camera
+orbit carried it with the geometry. Composing `makeRotationY` makes a turn a true
+rigid rotation, so a turn and an orbit are the same transform.
+
+Accepted consequence: at odd rotations the two side tones are exchanged relative
+to turn 0, because you are genuinely looking at a different pair of faces.
+
+`test/tone-convention.test.js` guards it by asserting the upper 3×3 is a proper
+rotation. **The guard was verified to fail**: reverting to `makeTranslation`
+produces "turn 1 left the basis unrotated", 3 pass / 1 fail. This defect class
+reverts silently — `makeTranslation` is shorter, looks correct, and neither a
+static shot nor the pixel gate distinguishes the two.
+
+### A correctness bug found by reframing
+
+The `avatar` and `avatarmid` shots were **not exactly isometric**. An orthographic
+camera at (40,40,40) aimed at (1,1,0) looks along (−39,−39,−40) — about 1.4° off
+the (1,1,1) diagonal. Those shots exist specifically to assert that the avatar's
+`(1,1,1)` view bias cancels on screen, which is exact *only* on the diagonal. The
+assertion had been weaker than its docstring claimed since P2. Framing is now
+derived: all eight corners of every cell are projected for a given view
+direction, the bounding box solved for frustum and target, and the camera placed
+at `target + distance * (−direction)`.
+
+### Cost, disclosed
+
+**Draw calls 2 → 3.** The extra call is the paper ground — a vertex-coloured quad
+parented to the camera. Everything else held, confirmed over 3 profiler runs:
+1 program, 0 compiled during play, 0 hitches, 0 MB heap growth, max frame
+0.9–1.2 ms. Boot rose 114–130 ms to 129–137 ms.
+
+The misregistered second impression costs **zero** additional draw calls — it is
+sixteen more instances on an InstancedMesh that already existed.
+
+### Verification
+
+| check | result |
+|---|---|
+| `npm test` | 112/112, exit 0 |
+| `analyze loop-01` / `probe-01` | exit 0 |
+| `npx vite build` | exit 0 |
+| `node tools/gate.mjs` | `identical: true` across 9 shots, exit 0 |
+| commit-frame delta | `identical: true`, 0/0 |
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
