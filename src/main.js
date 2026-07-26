@@ -2,6 +2,7 @@ import { makeConfig } from './core/config.js';
 import { Engine } from './core/engine.js';
 import render from './render/index.js';
 import world from './world/index.js';
+import campaign from './campaign/index.js';
 import player from './player/index.js';
 import ui from './ui/index.js';
 import audio from './audio/index.js';
@@ -31,6 +32,10 @@ await engine.add(player);
 await engine.add(ui);
 await engine.add(audio);
 await engine.add(world);
+// After world, so its first `level/loaded` sets the campaign index; and after
+// player, whose `level/solved` it listens for. Inert under capture (see the
+// header of src/campaign).
+await engine.add(campaign);
 
 const shots = makeShots(engine.ctx);
 

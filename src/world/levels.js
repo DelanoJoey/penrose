@@ -142,3 +142,20 @@ export const LEVELS = {
 };
 
 export const DEFAULT_LEVEL = 'loop-01';
+
+/**
+ * The campaign, in order. Separate from LEVELS on purpose.
+ *
+ * LEVELS is the full registry and stays reachable by `?level=`; probe-01 is a
+ * two-cell fixture and belongs in the registry but not in a playthrough.
+ *
+ * loop-01 opens, which reverses what the spec for this phase said. The spec
+ * argued it "teaches nothing and wins itself" because it solves in one move.
+ * That one move is the entire mechanic — a single sideways step that crosses
+ * fourteen units — and loop-01 is the only level whose figure is the bare
+ * tribar with nothing hung off it. As an opener that is the cleanest possible
+ * statement of what this game is. The turn is introduced immediately after.
+ *
+ * The curve is then the measured `minTurns` of each level: 0, 1, 2, 3.
+ */
+export const ORDER = ['loop-01', 'spur-01', 'span-02', 'shelf-03'];

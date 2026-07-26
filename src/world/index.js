@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { paintByNormal, PALETTE, INK, hash01, TURN_RADIANS } from '../render/index.js';
 import { Structure, rotateY, cellId } from '../geometry/index.js';
-import { LEVELS, DEFAULT_LEVEL } from './levels.js';
+import { LEVELS, DEFAULT_LEVEL, ORDER } from './levels.js';
 
 /**
  * Draws a level.
@@ -39,6 +39,15 @@ export default {
 
   async init(ctx) {
     this._ctx = ctx;
+    /**
+     * The campaign order, exposed for src/campaign to READ via ctx.peek.
+     *
+     * ARCHITECTURE.md §3.3 lets subsystems reach each other only through
+     * ctx.peek for a read, so the sequencing subsystem cannot import
+     * ./levels.js — that file lives inside this subsystem. The order is data,
+     * so it lives with the level data and is published here.
+     */
+    this.order = ORDER;
     const name = ctx.config.level && LEVELS[ctx.config.level] ? ctx.config.level : DEFAULT_LEVEL;
     this._install(name, ctx);
 
