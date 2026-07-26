@@ -239,6 +239,18 @@ Landed before any motion shot exists: 12 references verified maxDelta 0."
 
 A hardcoded `settle: 28` silently captures a different phase if `ORBIT_SECONDS` or `MOVE_SECONDS` changes. The constants do **not** determine the count in the obvious way — the orbit commits at 28 where `ceil(0.45 × 60)` says 27 — so pin the *derived counts*, not just the constants.
 
+**CORRECTED DURING IMPLEMENTATION.** The version below pins `MOVE_SECONDS` by regex-matching
+`src/player/index.js` source text, which is brittle to formatting and pins the *constant*
+rather than the *count*. What shipped instead drives the player through a minimal harness and
+asserts the **measured settle count is exactly 14**, plus a second test asserting `stepmid`'s
+frame 7 is strictly inside the interpolation. Both were verified to fail
+(`MOVE_SECONDS 0.22 → 0.3` reports "the step settle count changed").
+
+Also worth recording: `src/render/camera.test.js` derives `ORBIT_FRAMES` as **27** from the
+same constants in isolation, while the real engine commits at **28**. The extra frame appears
+only when the whole engine is driven, which is why `orbitlate` sits at 27 — the last frame
+still in flight.
+
 - [ ] **Step 1: Write the failing test**
 
 Create `test/motion-frames.test.js`:
