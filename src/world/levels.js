@@ -109,11 +109,40 @@ function ascent02() {
   };
 }
 
+/**
+ * tiers-03 — three turns, and occlusion carrying the puzzle.
+ *
+ * Three parallel walkways at different heights and depths. Two of them are
+ * crossed only by an illusion edge, and the standable count swings from 12 at
+ * turns 0 and 1 to 7 at turn 2 — rotating genuinely creates and destroys
+ * ground here, rather than merely rewiring which platforms connect.
+ *
+ * NEGATIVE COORDINATES ARE DELIBERATE. rotateY pivots at the world ORIGIN, so
+ * a level cannot be translated without changing what rotation does to it — the
+ * screen keys, and therefore the whole premise, would move. Straddling the
+ * origin also keeps the structure nearer the orbit pivot than loop-01's corner
+ * does, so it swings less at mid-orbit.
+ */
+function tiers03() {
+  const cells = [];
+  for (let i = 0; i <= 4; i++) cells.push([i, 0, 0]);        // lower walkway
+  for (let i = -2; i <= 1; i++) cells.push([i, 1, -1]);      // middle walkway
+  for (let i = -1; i <= 1; i++) cells.push([i, -1, 1]);      // upper-rear walkway
+  return {
+    name: 'tiers-03',
+    cells,
+    start: [0, 0, 0],
+    goal: [1, -1, 1],
+    premise: { turn: true, illusion: true, minWalks: 7, minTurns: 3, openWithWalk: true },
+  };
+}
+
 export const LEVELS = {
   'loop-01': loop01(),
   'probe-01': probe01(),
   'ledge-01': ledge01(),
   'ascent-02': ascent02(),
+  'tiers-03': tiers03(),
 };
 
 export const DEFAULT_LEVEL = 'loop-01';
