@@ -120,7 +120,88 @@ for (const d1 of DIRS) for (const d2 of DIRS) for (const d3 of DIRS) for (const 
   }
 }
 
-if (args.json) {
+/**
+ * PREMISE MODE — `--turns=N`.
+ *
+ * A figure that reads as impossible is worthless if it cannot host a route where
+ * rotation is load-bearing, and the bare figures cap out shallow. Augmentation is
+ * the unlock and it is what the shipping levels already do: spur-01, span-02 and
+ * shelf-03 are a bare tribar plus hung cells.
+ *
+ * The target is matched EXACTLY, not bounded. levels.test.js asserts
+ * `turnsInRoute >= minTurns`, so a route taking six turns would satisfy a
+ * `minTurns: 4` declaration and the campaign curve would be meaningless while
+ * every test stayed green. See spec §5.1.
+ */
+if (args.turns != null) {
+  const TARGET = Number(args.turns);
+  const SPUR_MAX = Number(args['spur-max'] ?? 3);
+  const out = [];
+
+  for (const f of hits) {
+    const solid = new Set(f.cellList.map((c) => cellId(...c)));
+    for (const anchor of f.cellList) {
+      for (const d of DIRS) {
+        for (let len = 1; len <= SPUR_MAX; len++) {
+          const extra = [];
+          let cur = anchor, ok = true;
+          for (let i = 0; i < len; i++) {
+            cur = [cur[0] + V[d][0], cur[1] + V[d][1], cur[2] + V[d][2]];
+            if (solid.has(cellId(...cur))) { ok = false; break; }
+            extra.push([...cur]);
+          }
+          if (!ok) continue;
+          const cells = [...f.cellList, ...extra];
+          const s = new Structure(cells);
+          // The spur must not fill the hole it was hung beside, or it destroys
+          // the read it was added to.
+          if (s.enclosedHoles(0).length === 0) continue;
+
+          for (const from of s.standable(0)) {
+            for (const to of cells) {
+              if (cellId(...from) === cellId(...to)) continue;
+              const p = s.premise(from, to);
+              if (!p.solvable || !p.requiresTurn || !p.usesIllusion) continue;
+              if (p.flatSolvableTurns.length !== 0) continue;
+              if (p.route?.[0]?.kind !== 'walk') continue;
+              if (p.turnsInRoute !== TARGET) continue;
+              out.push({
+                figure: f.legs,
+                spur: `${d}×${len} from ${anchor.join(',')}`,
+                cells: cells.length,
+                holes: s.enclosedHoles(0).length,
+                turns: p.turnsInRoute, walks: p.walksInRoute,
+                illusionWalks: p.illusionWalks,
+                start: from.join(','), goal: to.join(','),
+                cellList: cells,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // One entry per distinct augmented shape: the most walks, as the richest route.
+  const best = new Map();
+  for (const o of out) {
+    const k = canon(o.cellList);
+    const prev = best.get(k);
+    if (!prev || o.walks > prev.walks) best.set(k, o);
+  }
+  const shortlist = [...best.values()].sort((p, q) => (q.walks - p.walks) || (q.holes - p.holes));
+
+  if (args.json) {
+    console.log(JSON.stringify(shortlist, null, 2));
+  } else {
+    console.log(`augmented figures hosting a strong-premise route of EXACTLY ${TARGET} turns\n`);
+    console.log(`  (start,goal) pairs: ${out.length}   distinct augmented shapes: ${shortlist.length}\n`);
+    for (const o of shortlist.slice(0, 15)) {
+      console.log(`  ${o.figure.padEnd(24)} + ${o.spur.padEnd(20)} cells=${String(o.cells).padStart(2)} holes=${String(o.holes).padStart(2)} walks=${String(o.walks).padStart(2)} illusionWalks=${o.illusionWalks} start=${o.start} goal=${o.goal}`);
+    }
+    console.log('\n  NOT judged. Render these and look at them.');
+  }
+} else if (args.json) {
   console.log(JSON.stringify(hits, null, 2));
 } else {
   console.log(`four-leg circuits, legs ${MIN_LEG}..${MAX_LEG}\n`);
