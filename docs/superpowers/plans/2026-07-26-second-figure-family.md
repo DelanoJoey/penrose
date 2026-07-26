@@ -87,7 +87,7 @@ empty.
 
 The screen lattice has `a+b` always even, so every screen position has **six** neighbours, not four. A hole is an empty screen position that cannot reach the outside of the bounding box.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/geometry/holes.test.js`:
 
@@ -157,7 +157,7 @@ test('an empty structure has no holes rather than throwing', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and verify it fails for the right reason**
+- [x] **Step 2: Run it and verify it fails for the right reason**
 
 ```bash
 node --test src/geometry/holes.test.js
@@ -165,7 +165,7 @@ node --test src/geometry/holes.test.js
 
 Expected: FAIL — `s.enclosedHoles is not a function`. If it fails any other way, read the error before continuing.
 
-- [ ] **Step 3: Add `SCREEN_NEIGHBOURS` to `src/geometry/index.js`**
+- [x] **Step 3: Add `SCREEN_NEIGHBOURS` to `src/geometry/index.js`**
 
 Immediately after the `HORIZONTAL_STEPS` export:
 
@@ -178,7 +178,7 @@ Immediately after the `HORIZONTAL_STEPS` export:
 export const SCREEN_NEIGHBOURS = Object.values(SCREEN_DELTA);
 ```
 
-- [ ] **Step 4: Add the method to `Structure`, directly after `impossibleEdges`**
+- [x] **Step 4: Add the method to `Structure`, directly after `impossibleEdges`**
 
 ```js
   /**
@@ -239,23 +239,24 @@ export const SCREEN_NEIGHBOURS = Object.values(SCREEN_DELTA);
   }
 ```
 
-- [ ] **Step 5: Run the new test file**
+- [x] **Step 5: Run the new test file**
 
 ```bash
 node --test src/geometry/holes.test.js
 ```
 
-Expected: 7 pass, 0 fail.
+Expected: **6** pass, 0 fail. (The first draft of this plan said 7 — a miscount
+of the tests written directly above it. The file contains six `test(...)` calls.)
 
-- [ ] **Step 6: Run the FULL suite — no path scope**
+- [x] **Step 6: Run the FULL suite — no path scope**
 
 ```bash
 npm test
 ```
 
-Expected: `ℹ tests 173` / `ℹ pass 173` / `ℹ fail 0` (166 + 7).
+Expected: `ℹ tests 172` / `ℹ pass 172` / `ℹ fail 0` (166 + 6).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/geometry/index.js src/geometry/holes.test.js
@@ -555,7 +556,7 @@ Expected: no `FAILED` lines. `analyze.mjs` exits 1 on any declared-vs-measured m
 npm test
 ```
 
-Expected: 173 + 3 new premise tests per level (`declares a premise`, `start is not the goal`, `the declared premise is what the geometry measures`) = **182 pass, 0 fail**. The campaign curve test at `campaign.test.js:39` must pass — if it reports "the curve goes backwards", the `minTurns` ordering in `ORDER` is wrong.
+Expected: 172 + 3 new premise tests per level (`declares a premise`, `start is not the goal`, `the declared premise is what the geometry measures`) = **181 pass, 0 fail**. The campaign curve test at `campaign.test.js:39` must pass — if it reports "the curve goes backwards", the `minTurns` ordering in `ORDER` is wrong.
 
 - [ ] **Step 5: Commit**
 
@@ -648,7 +649,7 @@ Play all seven campaign levels to `campaign/complete`. `src/campaign` is inert u
 
 | check | command | bar |
 |---|---|---|
-| tests | `npm test` | 182 pass, 0 fail |
+| tests | `npm test` | 181 pass, 0 fail |
 | analyser | `analyze.mjs` × 8 levels | all exit 0 |
 | gate | `npm run gate` | `identical: true`, 18 shots |
 | references | `imagediff.mjs` before/after | 15 existing at `maxDelta: 0` |
@@ -690,7 +691,7 @@ Expected: `"conclusion": "success"`.
 
 ## Definition of done
 
-- [ ] 182 tests pass, full suite, no path scope
+- [ ] 181 tests pass, full suite, no path scope
 - [ ] All 8 levels exit 0 from `analyze.mjs`
 - [ ] Gate `identical: true` across 18 shots
 - [ ] The 15 pre-existing references at `maxDelta: 0`
