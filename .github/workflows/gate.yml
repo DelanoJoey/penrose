@@ -53,7 +53,10 @@ jobs:
       # here instead. tools/analyze.mjs exits non-zero on either.
       - name: Level design asserts
         run: |
-          for level in loop-01 probe-01; do
+          levels=$(node -e "import('./src/world/levels.js').then(m => console.log(Object.keys(m.LEVELS).join(' ')))")
+          echo "levels: $levels"
+          test -n "$levels" || { echo "no levels discovered"; exit 1; }
+          for level in $levels; do
             echo "--- $level"
             node tools/analyze.mjs "$level"
           done
