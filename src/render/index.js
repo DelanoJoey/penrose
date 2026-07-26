@@ -1025,6 +1025,16 @@ export default {
       geometries: i.memory.geometries,
       textures: i.memory.textures,
       pixelRatio: this.renderer.getPixelRatio(),
+      /**
+       * Whether a camera orbit is in flight AT THE SHUTTER.
+       *
+       * Reported so a capture is self-describing. tools/baseline.mjs refuses a
+       * shot that declared a settle count but landed on a settled frame: such a
+       * shot would be perfectly reproducible, pass the gate forever, and cover
+       * nothing — the same shape as any green result that measured something
+       * other than what it claimed.
+       */
+      orbiting: this.transitionState().active,
     };
   },
 

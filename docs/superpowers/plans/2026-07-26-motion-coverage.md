@@ -30,7 +30,7 @@
 | File | Responsibility |
 |---|---|
 | `src/render/index.js` *(modify)* | `info()` reports whether an orbit is in flight |
-| `src/player/index.js` *(modify)* | `state()` reports whether a step is in flight |
+| `src/player/index.js` *(modify)* | `motionState()` reports whether a step is in flight |
 | `tools/baseline.mjs` *(modify)* | per-shot `settle`; **fail** a declared-motion shot that isn't moving |
 | `src/dev/shots.js` *(modify)* | the contract note, then three motion shots |
 | `test/motion-frames.test.js` *(create)* | pin the measured frame counts, driving the engine |
@@ -91,13 +91,23 @@ In `src/render/index.js`, in `info()`, add one field:
 
 - [ ] **Step 2: Report step state from the player**
 
-In `src/player/index.js`, in `state()`, add:
+**CORRECTED DURING IMPLEMENTATION.** This originally said to add `moving` to `state()`. That is
+wrong and two existing tests catch it: `traversal.test.js:255` asserts `state()` is unchanged
+after 120 frames, because `state()` is the UI-facing snapshot and must be time-invariant or the
+HUD becomes frame-dependent. `moving` flips true → false as frames advance.
+
+Add a **separate** method instead, mirroring `render.transitionState()`:
 
 ```js
-      level: this.level?.name ?? null,
-      /** Whether a step interpolation is in flight. See render.info().orbiting. */
+  motionState() {
+    return {
       moving: this._duration > 0,
+      progress: this._duration > 0 ? Math.min(this._elapsed / this._duration, 1) : 0,
+    };
+  },
 ```
+
+placed immediately after `state()`, with a comment recording why it is not part of `state()`.
 
 - [ ] **Step 3: Verify both are false at rest and true in flight**
 
@@ -154,7 +164,7 @@ Replace the pump/screenshot section so the declared settle wins, and a declared-
     // loudly instead. See the spec, §6.
     const motion = await page.evaluate(() => ({
       orbiting: window.__ENGINE__?.ctx?.peek?.('render')?.info?.().orbiting === true,
-      moving: window.__ENGINE__?.ctx?.peek?.('player')?.state?.().moving === true,
+      moving: window.__ENGINE__?.ctx?.peek?.('player')?.motionState?.().moving === true,
     }));
     if (settle != null && !motion.orbiting && !motion.moving) {
       report.ok = false;

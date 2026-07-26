@@ -315,6 +315,28 @@ export default {
     };
   },
 
+  /**
+   * Whether a step interpolation is in flight, and how far through it is.
+   *
+   * DELIBERATELY NOT PART OF state(). state() is the UI-facing snapshot and is
+   * required to be time-invariant — `traversal.test.js` asserts that advancing
+   * 120 frames changes nothing in it, which is what stops the HUD becoming
+   * frame-dependent. `moving` flips true -> false as frames advance, so putting
+   * it there breaks that guarantee for every consumer, not just the one that
+   * wanted it.
+   *
+   * This mirrors render.transitionState() instead: a separate, explicitly
+   * time-varying read for tools that need to know whether anything is animating.
+   * tools/baseline.mjs uses it to refuse a shot that declared a settle count and
+   * landed on a settled frame.
+   */
+  motionState() {
+    return {
+      moving: this._duration > 0,
+      progress: this._duration > 0 ? Math.min(this._elapsed / this._duration, 1) : 0,
+    };
+  },
+
   update(ctx) {
     if (!this.mesh) return;
 
