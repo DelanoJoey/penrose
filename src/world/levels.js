@@ -88,10 +88,32 @@ function ledge01() {
   };
 }
 
+/**
+ * ascent-02 — walking and turning interleave.
+ *
+ * No single rotation contains a complete path: the tower is reachable from the
+ * ground only at one turn, and the upper walkway only from the tower at
+ * another. The route is walk, turn, walk, turn, walk.
+ */
+function ascent02() {
+  const cells = [];
+  for (let i = 0; i <= 4; i++) cells.push([i, 0, 0]);   // ground walkway
+  for (let j = 0; j <= 2; j++) cells.push([0, j, 1]);   // the tower
+  for (let i = 0; i <= 2; i++) cells.push([i, 3, 0]);   // upper walkway
+  return {
+    name: 'ascent-02',
+    cells,
+    start: [0, 0, 0],
+    goal: [2, 3, 0],
+    premise: { turn: true, illusion: true, minWalks: 5, minTurns: 2, openWithWalk: true },
+  };
+}
+
 export const LEVELS = {
   'loop-01': loop01(),
   'probe-01': probe01(),
   'ledge-01': ledge01(),
+  'ascent-02': ascent02(),
 };
 
 export const DEFAULT_LEVEL = 'loop-01';
