@@ -18,6 +18,7 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import net from 'node:net';
+import { profileArgs, platformNote } from './_browser.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? true] : [a, true];
@@ -49,11 +50,7 @@ if (!(await portOpen(PORT))) {
   if (!up) { server.kill(); throw new Error('vite failed to start'); }
 }
 
-const browser = await chromium.launch({
-  headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio',
-         '--disable-frame-rate-limit', '--disable-gpu-vsync'],
-});
+const browser = await chromium.launch({ headless: true, args: profileArgs() });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
@@ -134,6 +131,7 @@ const first = warm[0], lastS = warm[warm.length - 1];
 console.log(JSON.stringify({
   bootMs,
   bootMarks,
+  platform: platformNote,
   internal,
   frames: warm.length,
   frameTimeMs: { p1: q(0.01), p50: med, p90: q(0.9), p95: q(0.95), p99: q(0.99), max: q(1) },
