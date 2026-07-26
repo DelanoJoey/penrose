@@ -39,7 +39,7 @@
 
 **Files:** none
 
-- [ ] **Step 1: Install dependencies in the worktree**
+- [x] **Step 1: Install dependencies in the worktree**
 
 `node_modules/` is gitignored and NOT shared between worktrees.
 
@@ -48,7 +48,12 @@ cd /Users/jelstner/penrose/.worktrees/second-figure-family
 npm install && npx playwright install chromium
 ```
 
-- [ ] **Step 2: Verify the inherited baseline before changing anything**
+DONE 2026-07-26 — `added 20 packages, and audited 21 packages`, `found 0 vulnerabilities`.
+`npx playwright install chromium` printed nothing (already cached), so the browser
+was verified by launching it rather than by trusting the installer's silence:
+`chromium OK: 151.0.7922.34`.
+
+- [x] **Step 2: Verify the inherited baseline before changing anything**
 
 ```bash
 npm test
@@ -56,7 +61,9 @@ npm test
 
 Expected: `ℹ tests 166` / `ℹ pass 166` / `ℹ fail 0`. If this is not 166/166, **stop** — you are not on the commit this plan was written against.
 
-- [ ] **Step 3: Exclude a symlinked node_modules if you made one**
+DONE — `ℹ tests 166 / ℹ pass 166 / ℹ fail 0`, `duration_ms 133.160208`.
+
+- [x] **Step 3: Exclude a symlinked node_modules if you made one**
 
 `.gitignore` has `node_modules/` with a trailing slash, which matches **directories only**. A symlink shows as untracked and `git add -A` would commit the whole tree.
 
@@ -64,6 +71,11 @@ Expected: `ℹ tests 166` / `ℹ pass 166` / `ℹ fail 0`. If this is not 166/16
 grep -q '^node_modules$' .git/info/exclude || echo 'node_modules' >> .git/info/exclude
 git status --short   # expected: empty
 ```
+
+DONE — no action needed. `npm install` created a **real directory**, not a symlink,
+so the `node_modules/` pattern matches it; and the shared common-dir exclude
+already carries `/node_modules` from an earlier phase. `git status --short` is
+empty.
 
 ---
 
