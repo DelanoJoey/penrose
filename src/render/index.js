@@ -11,14 +11,120 @@ import * as THREE from 'three';
  * commonly tanks frame rate (a cascaded shadow + AO + TAA stack).
  */
 
-/** Stylised palette. Value separation carries the form, not lighting. */
+// =====================================================================
+//  ART DIRECTION — "riso": a limited-ink print, not a rendered object
+// =====================================================================
+/**
+ * THE PREMISE
+ *
+ * This is a screen-printed poster of an impossible object, not a photograph of
+ * one. Three consequences run through every decision below:
+ *
+ *   1. THERE IS NO LIGHT. A face's colour says which INK printed it, not which
+ *      way it faces a lamp. That is what makes the tone convention decidable
+ *      rather than a matter of taste — see THE TONE CONVENTION below.
+ *   2. THE INK COUNT IS FIXED. Three inks lay the structure (sunflower, bright
+ *      red, federal blue), one more prints the avatar (green), and the paper is
+ *      the fifth value. Nothing is blended, nothing is shaded, nothing is
+ *      graded — a tone is either laid down or it is not.
+ *   3. THE PRESS IS IMPERFECT. Ink density varies block to block, and the
+ *      plate is a hair off register. Both are procedural, both are baked once
+ *      at load, and neither costs a frame of work or a byte of network.
+ *
+ * Every colour here is a real Riso drum ink rather than a taste-picked hex:
+ * Sunflower FFB511, Bright Red F15060, Federal Blue 00317F, Green 00A95C. The
+ * point of naming them is that the three structure inks are separated in VALUE
+ * (0.72 / 0.50 / 0.17 relative luminance) as well as hue, so the isometric
+ * three-tone read survives even though there is no lighting term to carry it.
+ */
 export const PALETTE = {
-  bg:        0x2a1b3d,
-  faceTop:   0xf2b880,
-  faceLeft:  0xd98e73,
-  faceRight: 0xa9678a,
-  accent:    0x6dd3c4,
+  /** Paper. Warm, slightly toothy cream — the ground everything prints on. */
+  bg:        0xf0e7d5,
+  /** Sunflower — the up-facing plate. */
+  faceTop:   0xffb511,
+  /** Federal Blue — the ±z plate, i.e. the screen-left faces. */
+  faceLeft:  0x00317f,
+  /** Bright Red — the ±x plate, i.e. the screen-right faces. */
+  faceRight: 0xf15060,
+  /** HUD only (src/ui reads this). The scene marks cells with INK.knockout. */
+  accent:    0xffd84d,
 };
+
+/**
+ * Press behaviour. All multiplicative against the baked face tones, applied
+ * per instance through `instanceColor` — so it costs no extra draw call, no
+ * extra program and no per-frame work. Values above 1 are legal and are how a
+ * multiply-only channel is made to lighten.
+ */
+export const INK = {
+  /**
+   * Start and goal print with LESS ink, so they read as a knockout: the same
+   * block, the same plates, a lighter pass. A hue shift was tried first and
+   * cannot work — multiplying Federal Blue (red channel 0) by anything leaves
+   * it blue, so a "tint it green" marker turns two of the three plates to mud.
+   * Lifting density works on all three plates at once.
+   */
+  knockout: [1.60, 1.50, 1.35],
+  /**
+   * The misregistered plate: a second impression of every block, dropped
+   * slightly down the page and pulled toward the red drum.
+   */
+  ghost: [1.15, 0.62, 0.45],
+  /**
+   * How far down the page the second impression sits, in world units. A WORLD
+   * offset, not a screen one, so zooming into the print magnifies the
+   * misregistration exactly as a loupe would. It is along -Y and nothing else,
+   * which is the load-bearing part: -Y is the orbit axis, so this offset is
+   * invariant under the camera orbit AND under a world quarter turn. The ghost
+   * can therefore never slide, parallax or pop during a rotation.
+   *
+   * It is also what puts the ghost BEHIND: depth is x+y+z, so -Y is uniformly
+   * further from the camera and the second impression loses every depth test
+   * against its own block. No render order, no depth-state change, no second
+   * material — it only shows where the first impression does not cover it.
+   */
+  ghostDropY: 0.085,
+  /**
+   * Horizontal inset of the second impression, per side, in world units.
+   *
+   * NOT a look choice — a correctness one, found by rendering it. A pure -Y
+   * offset leaves the ghost's ±x and ±z faces exactly COPLANAR with the plate's,
+   * so over ~95% of every side face the two are at the same depth and the
+   * result is textbook coplanar z-fighting: soft blotches across the red and
+   * blue plates that read as dirt, not as ink. Pulling the ghost in along x and
+   * z separates every visible face in depth (only +x, +y, +z are ever drawn —
+   * the rest are back-facing and culled), which resolves it with no depth-state
+   * change, no polygon offset and no second material.
+   *
+   * The inset costs nothing visually: the second impression is only ever seen
+   * along the BOTTOM of the silhouette, where the -Y drop puts it, and the drop
+   * is unaffected by an x/z inset.
+   *
+   * Sized against MEASURED depth precision rather than guessed. The context is
+   * 24-bit depth over a 0.1..200 ortho range (tools/glinfo.mjs), i.e. 1.19e-5
+   * world units per step; an inset of 0.006 separates the visible faces by
+   * 0.006/sqrt(3) = 0.0035, which is ~290 depth steps — orders of magnitude
+   * past interpolation error, while leaving only a ~1.5 px break between
+   * consecutive second impressions along a run of cells. An earlier 0.03 was
+   * fully robust but left visible paper-coloured notches at every cell join.
+   */
+  ghostInset: 0.006,
+  /** Peak per-block ink density variation. Uneven lay-down, not noise. */
+  densityJitter: 0.055,
+};
+
+/**
+ * Deterministic hash in [0,1). Integer-only mixing (Math.imul + unsigned
+ * shifts) so it is bit-identical on every machine, and a pure function of its
+ * arguments so it consumes no rng stream and cannot drift when another
+ * subsystem's call count changes (ARCHITECTURE.md §2).
+ */
+export function hash01(a, b = 0) {
+  let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul((b | 0) + 0x9e3779b9, 0x165667b1);
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 
 /**
  * Paint vertex colours by face normal: up-facing gets the light tone, the two
@@ -116,14 +222,37 @@ export function paintByNormal(geometry, { top, left, right } = {}) {
  * the exact isometric angle, and both are named in the report:
  *
  *   1. FACE TONES (3.0987%, max 48 — exactly |faceLeft.r - faceRight.r|).
+ *      ===== CLOSED BY THE "riso" ART DIRECTION. TONE IS FIXED TO THE WORLD. =====
  *      paintByNormal bakes tone onto WORLD-space normals, and src/world's
- *      _applyRotation only translates its instances. A world turn therefore
- *      leaves the tone-to-screen-side mapping fixed, while a 90 deg camera orbit
- *      exchanges the +-x and +-z families. Fix (src/world, one line): compose
- *      makeRotationY(turns * PI/2) into the instance matrix so tone rotates with
- *      the cell. That makes a world turn a true rigid rotation and the swap
- *      exactly pixel-clean — it is an intentional art change and needs a
- *      deliberate reference re-capture (ARCHITECTURE.md §5).
+ *      _applyRotation used to only translate its instances. A world turn
+ *      therefore left the tone-to-screen-side mapping fixed, while a 90 deg
+ *      camera orbit exchanged the +-x and +-z families.
+ *
+ *      src/world now composes makeRotationY(turns * PI/2) into the instance
+ *      matrix, so a world turn is a true rigid rotation and the face tones
+ *      rotate with the cell. The full argument for choosing this convention
+ *      over the screen-fixed one — a print has inks, not a key light — is in
+ *      src/world/_applyRotation, together with the structural argument: the
+ *      screen-fixed convention cannot be held through a 90 deg orbit without a
+ *      per-frame vertex-colour repaint or a second shader program, and this one
+ *      is one matrix op per instance at rotation time only.
+ *
+ *      Two consequential decisions elsewhere fall out of the same choice, and
+ *      are recorded where they live: the avatar's ±x and ±z tones are now the
+ *      SAME ink (src/player), because the pawn's mesh is not rotated and would
+ *      otherwise be the last object in the scene still keyed to the screen; and
+ *      the misregistered second impression is displaced along -Y only
+ *      (INK.ghostDropY), the one axis invariant under both the orbit and the
+ *      turn.
+ *
+ *      RE-MEASURED after the change, same method, tools/commitframe.mjs, 1600x1000:
+ *
+ *        hero,   avatar visible at the biased start cell .. 0%, max 0, mean 0
+ *        avatar, same transition at frustum 3.27 .......... 0%, max 0, mean 0
+ *
+ *      i.e. the end-swap is now provably pixel-clean through the real renderer,
+ *      which is exactly what the control capture above predicted. Nothing about
+ *      the swap's placement changed; the residual it was carrying is gone.
  *   2. AVATAR VIEW BIAS (0.24%, max 228) — FIXED AT INTEGRATION, in src/player.
  *      src/player pushed the avatar t steps along world (1,1,1) to win the depth
  *      test; that is a screen no-op only on-axis, so off-axis it read as a
@@ -136,11 +265,107 @@ export function paintByNormal(geometry, { top, left, right } = {}) {
  *      nothing changes. The commit frame no longer moves it at all — centroid
  *      843.7, 431.5 on both sides of the swap.
  *
- * Residual 1 is not fixable from src/render, and neither residual is a reason to
- * move the swap:
- * once (1) lands, the end-swap is provably clean, which the control above
- * already demonstrates.
+ * BOTH RESIDUALS ARE NOW CLOSED, and neither was ever a reason to move the
+ * swap. That was the standing argument — "once (1) lands, the end-swap is
+ * provably clean, which the control above already demonstrates" — and (1) has
+ * now landed and the measurement agrees with the control exactly.
  */
+
+// =====================================================================
+//  THE PAPER — procedural, vertex-data only, one extra draw call
+// =====================================================================
+/**
+ * The ground the ink prints on.
+ *
+ * A flat clear colour is a background; PAPER is a surface. The difference is
+ * the tooth, and the tooth is the whole reason this direction is called riso
+ * rather than "flat colours". It is generated once at load from an integer
+ * hash — no image file, no network fetch, no canvas texture, and therefore no
+ * second program from a background pass.
+ *
+ * HOW IT STAYS INSIDE THE BUDGET
+ *
+ *   - It is an InstancedMesh of count 1 with an instanceColor attribute, not a
+ *     plain Mesh. That is deliberate and load-bearing: USE_INSTANCING and
+ *     USE_INSTANCING_COLOR are part of three.js's program cache key, so a plain
+ *     Mesh here would compile a SECOND program. src/player already documents
+ *     this trick for the avatar; the paper uses the same one, and the measured
+ *     program count stays at 1.
+ *   - It is parented to the CAMERA and scaled in _resize() to exactly the ortho
+ *     frustum, so it needs no per-frame work at all — not a matrix write, not a
+ *     colour upload. It moves because the camera moves.
+ *   - Grain is therefore fixed in SCREEN space while the misregistered plate is
+ *     fixed in WORLD space. That asymmetry is chosen, not accidental: each shot
+ *     is its own print, so the paper tooth is the same size on every one of
+ *     them, while a loupe held over the print magnifies the off-register. The
+ *     alternative — world-scaled grain — cannot hold a legible tooth across the
+ *     set's 6:1 zoom range without a vertex count an order of magnitude larger.
+ *
+ * Cost, stated plainly: +1 draw call, +0 programs, +0 per-frame work.
+ */
+const PAPER = {
+  /** Grid cells across the frame. 320 x 200 is ~5 px per cell at 1600x1000. */
+  cols: 320,
+  rows: 200,
+  /** Distance behind the camera plane. Inside the 0.1..200 ortho depth range. */
+  depth: 140,
+  /** Overscan so no seam can show at the frame edge. */
+  bleed: 1.03,
+  /** Mottle octaves: [cell size in grid units, amplitude]. */
+  octaves: [[38, 0.030], [11, 0.020], [3, 0.013]],
+  /** Per-vertex tooth, at the grid's own frequency. */
+  tooth: 0.026,
+  /** How much cooler the darker fibres run, as a fraction of the mottle. */
+  fibre: 0.45,
+};
+
+/** Bilinear value noise on the integer lattice. Pure, deterministic, no rng. */
+function valueNoise(x, y, cell, salt) {
+  const fx = x / cell, fy = y / cell;
+  const ix = Math.floor(fx), iy = Math.floor(fy);
+  const tx = fx - ix, ty = fy - iy;
+  const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+  const n00 = hash01(ix * 73856093 + iy * 19349663, salt);
+  const n10 = hash01((ix + 1) * 73856093 + iy * 19349663, salt);
+  const n01 = hash01(ix * 73856093 + (iy + 1) * 19349663, salt);
+  const n11 = hash01((ix + 1) * 73856093 + (iy + 1) * 19349663, salt);
+  return (n00 * (1 - sx) + n10 * sx) * (1 - sy) + (n01 * (1 - sx) + n11 * sx) * sy;
+}
+
+/**
+ * A unit quad, subdivided, with paper tooth baked into its vertex colours.
+ * Returns geometry whose colours are already multiplied against PALETTE.bg, so
+ * the mesh needs no tint and the clear colour behind it matches exactly.
+ */
+function paperGeometry() {
+  const g = new THREE.PlaneGeometry(1, 1, PAPER.cols, PAPER.rows);
+  const pos = g.getAttribute('position');
+  const base = new THREE.Color(PALETTE.bg);
+  const colors = new Float32Array(pos.count * 3);
+
+  for (let i = 0; i < pos.count; i++) {
+    const gx = i % (PAPER.cols + 1);
+    const gy = (i / (PAPER.cols + 1)) | 0;
+
+    let n = 0;
+    for (let o = 0; o < PAPER.octaves.length; o++) {
+      const [cell, amp] = PAPER.octaves[o];
+      n += (valueNoise(gx, gy, cell, o * 977 + 13) - 0.5) * 2 * amp;
+    }
+    n += (hash01(gx * 92837111 + gy * 689287499, 7717) - 0.5) * 2 * PAPER.tooth;
+
+    // Darker fibres run cooler, lighter ones warmer — the same shift a warm
+    // stock shows under uneven coverage. One expression, no branch.
+    const warm = 1 + n * (1 + PAPER.fibre);
+    const cool = 1 + n * (1 - PAPER.fibre);
+    colors[i * 3 + 0] = base.r * warm;
+    colors[i * 3 + 1] = base.g * (1 + n);
+    colors[i * 3 + 2] = base.b * cool;
+  }
+
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return g;
+}
 
 /** One quarter turn. */
 export const TURN_RADIANS = Math.PI / 2;
@@ -162,6 +387,7 @@ export const ORBIT_SECONDS = 0.45;
  */
 export const MAX_QUEUED_TURNS = 3;
 
+const WORLD_UP = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
 const ORBIT_AXIS = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
 const ORIGIN = /* @__PURE__ */ new THREE.Vector3(0, 0, 0);
 const _q = /* @__PURE__ */ new THREE.Quaternion();
@@ -299,7 +525,32 @@ export default {
     this.camera.lookAt(0, 0, 0);
     this.frustumSize = 26;
 
+    // The paper rides with the camera, so the camera has to be in the scene
+    // graph for its children's world matrices to be updated by the traversal.
+    this.paper = new THREE.InstancedMesh(
+      paperGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true }), 1);
+    this.paper.name = 'paper';
+    this.paper.instanceColor =
+      new THREE.InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3);
+    this.paper.setMatrixAt(0, new THREE.Matrix4());
+    this.paper.instanceMatrix.needsUpdate = true;
+    this.paper.frustumCulled = false;
+    this.paper.position.set(0, 0, -PAPER.depth);
+    this.camera.add(this.paper);
+    this.scene.add(this.camera);
+
     this._initTransitions(ctx);
+
+    /**
+     * Frame the level the moment it exists. Camera framing being off-centre
+     * was a known deferred item through P0 and P1; composition is part of this
+     * art direction, so the default view is now derived from the level's own
+     * screen bounds rather than from a hand-placed camera that happened to
+     * point near the structure. Dev shots run after this and override it.
+     */
+    ctx.on('level/loaded', (level) => {
+      if (Array.isArray(level?.cells)) this.frameCells(level.cells, { fillY: 0.70, fillX: 0.80 });
+    });
 
     this._resize();
     this._onResize = () => this._resize();
@@ -307,6 +558,83 @@ export default {
 
     ctx.engine.scene = this.scene;
     ctx.engine.camera = this.camera;
+  },
+
+  // ------------------------------------------------------------- composition
+  /**
+   * COMPOSITION IS A RENDER CONCERN, NOT A PER-SHOT ONE.
+   *
+   * Every shot in the set used to be a hand-placed camera position plus a
+   * hand-tuned frustum, and every one of them was mis-framed: the structure sat
+   * off to one side with most of the canvas empty, and two of them
+   * (`avatar`, `avatarmid`) were not even exactly isometric, because a lookAt
+   * target off the (1,1,1) diagonal tilts the view direction off the diagonal
+   * by a degree or two. That silently weakened the one assertion the `avatar`
+   * shot exists to make.
+   *
+   * So framing is derived instead. Given the cells to be shown and a view
+   * DIRECTION, this projects all eight corners of every cell onto the screen
+   * basis, takes the bounding box, and solves for the orthographic frustum and
+   * the lookAt target that place that box where the composition asks for it.
+   * The camera position is then target + distance * (-direction), which keeps
+   * the view direction EXACTLY as specified — so an isometric shot is exactly
+   * isometric no matter where its subject sits in the world.
+   *
+   * @param cells   world positions of unit cells, already rotated for the view
+   * @param dir     view direction, camera toward subject. Default: isometric.
+   * @param fillX   fraction of frame width the subject may occupy
+   * @param fillY   fraction of frame height the subject may occupy
+   * @param liftY   fraction of frame height to raise the subject. Optical
+   *                centring: a mass placed at true centre reads as sagging.
+   * @param shiftX  fraction of frame width to move the subject right
+   */
+  frameCells(cells, {
+    dir = [-1, -1, -1],
+    fillX = 0.84, fillY = 0.76,
+    liftY = 0.02, shiftX = 0,
+    distance = 60,
+    extent = 0.5,
+  } = {}) {
+    if (!Array.isArray(cells) || cells.length === 0) return null;
+
+    const z = new THREE.Vector3(-dir[0], -dir[1], -dir[2]).normalize();
+    const x = new THREE.Vector3().crossVectors(WORLD_UP, z).normalize();
+    const y = new THREE.Vector3().crossVectors(z, x);
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    const p = new THREE.Vector3();
+    for (const c of cells) {
+      for (let k = 0; k < 8; k++) {
+        p.set(
+          c[0] + (k & 1 ? extent : -extent),
+          c[1] + (k & 2 ? extent : -extent),
+          c[2] + (k & 4 ? extent : -extent),
+        );
+        const px = p.dot(x), py = p.dot(y);
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+      }
+    }
+
+    const aspect = (globalThis.innerWidth || 1) / (globalThis.innerHeight || 1);
+    const frustum = Math.max((maxY - minY) / fillY, (maxX - minX) / (fillX * aspect));
+
+    // The subject appears at (subject - target), so raising it on screen means
+    // lowering the TARGET. Sign errors here are silent and look like sag.
+    const cx = (minX + maxX) / 2 - shiftX * frustum * aspect;
+    const cy = (minY + maxY) / 2 - liftY * frustum;
+
+    const target = new THREE.Vector3()
+      .addScaledVector(x, cx)
+      .addScaledVector(y, cy);
+
+    this.camera.position.copy(target).addScaledVector(z, distance);
+    this.camera.lookAt(target);
+    this.frustumSize = frustum;
+    this._resize();
+    return { frustum, target };
   },
 
   /**
@@ -363,6 +691,10 @@ export default {
     this.camera.top = s / 2;
     this.camera.bottom = -s / 2;
     this.camera.updateProjectionMatrix();
+    // The paper is a unit quad: scaling it to the frustum here is the entire
+    // reason it needs no per-frame work, and it is what keeps the grain the
+    // same size on screen in a 5-unit close-up and a 30-unit wide shot.
+    this.paper?.scale.set(s * aspect * PAPER.bleed, s * PAPER.bleed, 1);
     this.renderer.setSize(w, h, false);
   },
 
@@ -468,15 +800,15 @@ export default {
    *   even shorten the off-axis interval: peak deviation from the nearest
    *   isometric axis is 45 degrees either way.
    *
-   *   The honest counter-argument, stated because it is real: while the face
-   *   tones are baked to world axes (residual 1 above), the swap frame carries
-   *   a visible tone exchange, and the end is the WORST place to put it —
-   *   everything has just resolved, so the eye is on it. Mid-orbit, at peak
-   *   disassembly, it would hide better. That is still not a reason to move the
-   *   swap. It would buy a temporary cosmetic win by permanently desynchronising
-   *   state from picture for half of every transition, to camouflage a defect
-   *   that is one line from being fixed — and once fixed, the end-swap is
-   *   provably clean, which the control capture above already demonstrates.
+   *   The counter-argument that used to be stated here — that while face tones
+   *   were baked to world axes the swap frame carried a visible tone exchange,
+   *   and the end is the worst place to put a flicker because everything has
+   *   just resolved — is now MOOT rather than merely outweighed. The tone
+   *   convention above is resolved, and the commit frame measures 0% changed,
+   *   maxDelta 0 with the avatar visible at its biased start cell. There is
+   *   nothing left at the end of the orbit to hide, so the argument for moving
+   *   the swap mid-orbit to camouflage it has lost its premise as well as
+   *   having always lost on the merits.
    *
    * The end-swap is also the fail-safe direction. An orbit abandoned partway
    * (level reload, a dev shot, an opposing rotate) has committed nothing: the
@@ -564,6 +896,10 @@ export default {
     globalThis.removeEventListener('resize', this._onResize);
     this._orbit = null;
     this._pending = 0;
+    this.paper?.removeFromParent();
+    this.paper?.geometry?.dispose();
+    this.paper?.material?.dispose();
+    this.paper = null;
     this.renderer.dispose();
     this.canvas.remove();
   },

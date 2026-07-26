@@ -44,18 +44,38 @@ const HOP = 0.15;
  */
 const CLEARANCE = 3;
 
-/** Pawn dimensions and its three face tones — accent-family, mint. */
+/**
+ * Pawn dimensions and its face tones — the fourth ink.
+ *
+ * The three structure plates are sunflower, bright red and federal blue; the
+ * avatar prints on a drum of its own, Riso Green 00A95C, so it is never
+ * confused with a face of the structure at any rotation.
+ *
+ * LEFT AND RIGHT ARE DELIBERATELY THE SAME INK, and that is load-bearing rather
+ * than a simplification. The art direction fixes tone to the OBJECT: src/world
+ * composes the quarter turn into its instance matrices so face tones rotate
+ * with the geometry, which is what makes the rotation commit frame pixel-clean.
+ * The avatar is a separate mesh whose orientation is not rotated, so a pawn
+ * with distinct ±x and ±z tones would be the one thing left in the scene still
+ * keyed to the screen — and it would put a tone swap back on the commit frame,
+ * on the one object the eye is following. Two tones instead of three costs the
+ * pawn nothing (it is 4-fold symmetric about Y, so it is now literally
+ * invariant under a quarter turn) and it is more honest to a limited-ink print
+ * anyway: a small mark gets one drum, not three.
+ *
+ * Deliberately NOT imported from src/render — ARCHITECTURE.md §3.3 forbids
+ * subsystems importing each other, and src/geometry is the only permitted
+ * direct reach.
+ */
 const AVATAR = {
   height: 0.8,
   radiusBottom: 0.34,
   radiusTop: 0.22,
-  /** Matching src/render's convention: up-facing gets the light tone, the two
-   *  horizontal axes get the mid and dark tones. Deliberately NOT imported from
-   *  src/render — ARCHITECTURE.md §3.3 forbids subsystems importing each other,
-   *  and src/geometry is the only permitted direct reach. */
-  top: 0xdefff7,
-  left: 0x5fc9ba,
-  right: 0x3f9a92,
+  /** A lighter pass on the cap, so the pawn still reads as a solid. */
+  top: 0x6fdfac,
+  /** Riso Green, all four sides. */
+  left: 0x00a95c,
+  right: 0x00a95c,
 };
 
 // ---------------------------------------------------------------- mesh build
