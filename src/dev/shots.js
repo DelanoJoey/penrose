@@ -214,6 +214,26 @@ export function makeShots(ctx) {
       { level: 'shelf-03' }),
 
     /**
+     * The three four-leg levels — the second figure family.
+     *
+     * Same reason as the plates above, with one difference that matters: these
+     * figures are not tribars, so the tribar's framing constants are not
+     * automatically right for them. Each is filled to its own shape rather than
+     * inheriting 0.74/0.84.
+     *
+     * arm-04 is the widest — the beam driven through its own triangle spans
+     * further across the screen than any tribar — so it takes the smallest fill
+     * to keep its extremes off the edge. crook-06 is the only upright figure in
+     * the project, so it fills more of Y and less of X than anything else here.
+     */
+    arm04: Object.assign(plate(0, { fillY: 0.74, fillX: 0.84, liftY: 0.025 }),
+      { level: 'arm-04' }),
+    perch05: Object.assign(plate(0, { fillY: 0.695, fillX: 0.82, liftY: 0.005 }),
+      { level: 'perch-05' }),
+    crook06: Object.assign(plate(0, { fillY: 0.74, fillX: 0.70, liftY: 0.02 }),
+      { level: 'crook-06' }),
+
+    /**
      * ===================== MOTION SHOTS =====================
      *
      * The only three shots in the set captured MID-FLIGHT. Each declares the

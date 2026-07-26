@@ -595,13 +595,13 @@ git commit -m "levels: three levels on the four-leg figure"
 **Files:**
 - Modify: `src/dev/shots.js`
 
-- [ ] **Step 1: Capture the existing 15 references BEFORE touching anything**
+- [x] **Step 1: Capture the existing 15 references BEFORE touching anything**
 
 ```bash
 node tools/baseline.mjs --out=/tmp/sff-before --port=5601
 ```
 
-- [ ] **Step 2: Add three shots beside `spur01` / `span02` / `shelf03`**
+- [x] **Step 2: Add three shots beside `spur01` / `span02` / `shelf03`**
 
 ```js
     <name1>: Object.assign(plate(0, { fillY: 0.74, fillX: 0.84, liftY: 0.025 }),
@@ -610,7 +610,7 @@ node tools/baseline.mjs --out=/tmp/sff-before --port=5601
 
 Tune `fillY` / `fillX` per figure so the subject fills the frame — these figures are a different shape from the tribar and the tribar's framing constants are not automatically right.
 
-- [ ] **Step 3: Capture after, and prove the existing references did not move**
+- [x] **Step 3: Capture after, and prove the existing references did not move**
 
 ```bash
 node tools/baseline.mjs --out=/tmp/sff-after --port=5601
@@ -619,11 +619,11 @@ node tools/imagediff.mjs --a=/tmp/sff-before --b=/tmp/sff-after
 
 Expected: the 15 pre-existing shots report `maxDelta: 0`. A new level must be invisible to an existing shot. If any existing shot moved, **stop and find out why** — do not re-baseline.
 
-- [ ] **Step 4: OPEN THE THREE NEW PLATES**
+- [x] **Step 4: OPEN THE THREE NEW PLATES**
 
 Look at each one. A shot that frames its subject badly gates less than it claims — P6 shipped an orbit shot with a third of the structure out of frame and every automated check passed.
 
-- [ ] **Step 5: Run the gate**
+- [x] **Step 5: Run the gate**
 
 ```bash
 npm run gate
@@ -633,7 +633,7 @@ Expected: `identical: true` across 18 shots.
 
 Note: `npm run gate` captures the same tree twice and compares. **It cannot fail on a code change** — it is a determinism self-check, and Step 3 is what proves a change moved no pixels.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/dev/shots.js
