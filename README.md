@@ -75,6 +75,30 @@ Target selection is the engineering decision.
 | `tools/baseline.mjs` | Reproducible capture: isolated page per shot, fixed frame budget |
 | `tools/imagediff.mjs` | Per-pixel gate. Strict identity by default; `--tol` is an explicit opt-out |
 | `tools/profile.mjs` | Frame-time distribution and hitch attribution via per-frame WebGL program counts |
+| `tools/analyze.mjs` | Level design asserts — is the level solvable, and is the illusion load-bearing? |
+| `tools/grade.mjs` | Blind pairwise grading: seeded blinding, position-bias check, inter-judge agreement |
+
+### Blind grading
+
+```bash
+node tools/grade.mjs prepare --candidates=/tmp/a,/tmp/b --reference=/tmp/ref \
+                             --out=/tmp/grade --seed=run-1
+# judges see /tmp/grade/manifest.json and /tmp/grade/pairs/ — never key.json
+node tools/grade.mjs tally --dir=/tmp/grade --verdicts=/tmp/verdicts.json
+```
+
+The win rate is the number everyone quotes and the number that means least. This
+reports two others alongside it:
+
+- **Position bias** — if judges chose "left" far from half the time they were
+  responding to position rather than content, and every score is suspect.
+- **Inter-judge agreement** — near chance means the panel detected no shared
+  signal, so the win rate is noise however decisive it looks. High agreement means
+  either a real difference *or* a bias the judges share; this statistic cannot
+  distinguish those, and pretending otherwise is how blind panels get oversold.
+
+Either condition exits non-zero. Blinding is seeded, so anyone holding the seed
+can re-derive the assignment and check the arithmetic rather than trusting it.
 
 ## License
 

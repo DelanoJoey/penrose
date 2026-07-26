@@ -12,7 +12,8 @@
     "baseline": "node tools/baseline.mjs",
     "diff": "node tools/imagediff.mjs",
     "profile": "node tools/profile.mjs",
-    "gate": "node tools/gate.mjs"
+    "gate": "node tools/gate.mjs",
+    "grade": "node tools/grade.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

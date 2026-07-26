@@ -5,3 +5,4 @@ shots/*/
 !shots/.gitkeep
 *.diff.png
 .DS_Store
+.claude/
