@@ -1,30 +1,133 @@
 import * as THREE from 'three';
+// src/geometry is a pure module with no engine state and is the one direct
+// import ARCHITECTURE.md §3.3 permits between subsystems.
+import { rotateY } from '../geometry/index.js';
 
 /**
  * Renderer + isometric camera rig.
  *
- * Deliberately flat-shaded: face colour comes from the face normal, not from a
- * light. There is no lighting term, no shadow pass, no temporal accumulation
- * and no tonemapping in the P0 stub. That is a target choice, not a shortcut —
+ * ART DIRECTION: "dusk" — TWILIGHT MONUMENT.
+ *
+ * The thesis is that this should read as a PLACE, not a diagram: a stone
+ * structure standing in deep blue twilight, raked by a single low warm sun,
+ * with the far side of it sinking into haze. Three decisions carry that, and
+ * they are one coupled system rather than three preferences:
+ *
+ *   1. PALETTE — a four-step value ladder (sky 17, haze 50, shadow 67, key 154,
+ *      sun-struck top 221 in 8-bit relative luminance) so VALUE carries the
+ *      form. Hue then does one job only: warm family = the monument, cool
+ *      family = the sky, the player, and the two cells that matter.
+ *   2. TONE CONVENTION — the light is fixed in the WORLD, so a rotation shows
+ *      you the other side of the monument rather than following your head
+ *      around. See the long note below; it is measured, not asserted.
+ *   3. ATMOSPHERE — linear fog keyed to view depth, which under this projection
+ *      IS the lattice depth x+y+z that src/geometry already uses to resolve
+ *      occlusion. So the depth cue and the occlusion rule are the same fact
+ *      rendered twice, and they cannot disagree.
+ *
+ * Still deliberately flat-shaded: face colour comes from the face normal, not
+ * from a light. There is no lighting term, no shadow pass, no temporal
+ * accumulation and no tonemapping. That is a target choice, not a shortcut —
  * see METHODOLOGY.md. It removes the two things that most commonly break a
  * pixel gate (auto-exposure adaptation, TAA history) and the thing that most
- * commonly tanks frame rate (a cascaded shadow + AO + TAA stack).
+ * commonly tanks frame rate (a cascaded shadow + AO + TAA stack). Fog is the
+ * one thing added here and it costs neither: it is a define on the material
+ * that both meshes already share, so the program count stays at 1 and the draw
+ * count stays at 2. Measured, in the report.
  */
 
-/** Stylised palette. Value separation carries the form, not lighting. */
+/**
+ * Stylised palette — deep saturated dusk. Value separation carries the form.
+ *
+ * Approximate 8-bit relative luminance (0.2126R + 0.7152G + 0.0722B), which is
+ * the ladder the composition actually rests on:
+ *
+ *   faceTop   221   sky-lit upper planes — the brightest surface in frame
+ *   faceRight 154   THE KEY: a low warm sun raking the +-x faces
+ *   faceLeft   67   cool shadow: the -+z faces, lit only by the violet sky
+ *   haze       50   atmospheric target; distant geometry sinks toward this
+ *   bg         17   twilight zenith
+ *
+ * Every step is separated by more than 15 luminance units, so the read survives
+ * being printed small, desaturated, or looked at by someone colour-blind.
+ *
+ * `haze` is LIGHTER than `bg` on purpose. Far geometry therefore does not
+ * dissolve into the sky, it flattens toward a pale band and stays legible as
+ * silhouette — which is what real atmospheric perspective does at dusk, and
+ * which keeps the far leg of the tribar readable rather than swallowed.
+ *
+ * `accent` is a MULTIPLIER over the face tones — src/world writes it into
+ * instanceColor, which three.js multiplies — so it can only darken. There is no
+ * additive channel available without a second material, and a second material
+ * is a second shader program. That constraint decides the design rather than
+ * being fought: start and goal are drawn as a colder, darker stone rather than
+ * as a glow. The specific value is picked so the product stays clean against
+ * all three face tones — a tint with a mid green channel turns the amber key
+ * face olive, which is the one genuinely ugly failure mode here; pulling green
+ * down with blue instead gives lilac / brick / deep blue, a coherent second
+ * value ladder sitting one step under the monument's.
+ *
+ * The player's pawn (src/player) is the only saturated mint in the scene, so
+ * "where you are" and "where the level begins and ends" never compete.
+ */
 export const PALETTE = {
-  bg:        0x2a1b3d,
-  faceTop:   0xf2b880,
-  faceLeft:  0xd98e73,
-  faceRight: 0xa9678a,
-  accent:    0x6dd3c4,
+  bg:        0x120e2e,
+  haze:      0x342c68,
+  faceTop:   0xffd9a2,
+  faceRight: 0xef8a44,
+  faceLeft:  0x4a3b80,
+  accent:    0x8a86ff,
 };
+
+// =====================================================================
+//  ATMOSPHERE — a depth cue that cannot disagree with the occlusion rule
+// =====================================================================
+/**
+ * Under an orthographic camera looking along -(1,1,1), a point's view depth is
+ *
+ *     depth(p) = ORIGIN_DEPTH - (x + y + z) / sqrt(3)
+ *
+ * and `x + y + z` is exactly `src/geometry`'s `depth()`, the quantity that
+ * decides which of two aliased cells you actually see. So the haze band is
+ * specified in LATTICE units and converted, rather than tuned in view units:
+ * the thing that fades is the thing that loses the depth test.
+ *
+ * Consequence worth stating plainly, because it is an art decision and not an
+ * accident: loop-01's near leg (x+y+z near 0) is the FAR one, so the leg the
+ * player starts on is the hazy one and the goal corner at x+y+z = 15 is clear.
+ * The impossible edge 1,0,0 -> 5,5,5 therefore visibly crosses 14 units of
+ * atmosphere in one step. That makes the trick MORE legible, not less, which is
+ * the same choice the `offaxis` shot already makes: this project shows its
+ * working.
+ *
+ * ORIGIN_DEPTH is the view depth every framed camera puts the world origin at.
+ * Pinning it is what makes the haze a property of the WORLD instead of a
+ * property of how far back a particular shot happens to sit — without it, the
+ * `wide` shot and the `seam` shot would be differently hazy for no reason.
+ * 40*sqrt(3) is the depth of the (40,40,40) placement the shots used before.
+ */
+const SQRT3 = Math.sqrt(3);
+export const ORIGIN_DEPTH = 40 * SQRT3;
+/** Lattice depth at which haze starts. Just in front of loop-01's near face. */
+export const HAZE_SUM_NEAR = 17;
+/** Lattice depth at which haze would saturate. Placed well BEHIND the structure
+ *  so the band the level actually occupies is the shallow, gentle part of the
+ *  curve: loop-01's deepest face reaches ~39% haze and nothing is ever
+ *  dissolved. Pulling this closer reads as fog rather than as distance. */
+export const HAZE_SUM_FAR = -27;
+
+export const FOG_NEAR = ORIGIN_DEPTH - HAZE_SUM_NEAR / SQRT3;
+export const FOG_FAR = ORIGIN_DEPTH - HAZE_SUM_FAR / SQRT3;
 
 /**
  * Paint vertex colours by face normal: up-facing gets the light tone, the two
  * horizontal axes get the mid and dark tones. This is what produces the
  * isometric three-tone read with zero lighting maths — and therefore with
  * bit-identical output across runs.
+ *
+ * The tone is baked onto the LOCAL normal, so it travels with the geometry. See
+ * the tone-convention note below: that is what makes "the light is fixed in the
+ * world" the cheap convention and its opposite the expensive one.
  */
 export function paintByNormal(geometry, { top, left, right } = {}) {
   const cTop   = new THREE.Color(top   ?? PALETTE.faceTop);
@@ -142,6 +245,81 @@ export function paintByNormal(geometry, { top, left, right } = {}) {
  * already demonstrates.
  */
 
+// =====================================================================
+//  THE TONE CONVENTION — RESOLVED. LIGHT IS FIXED IN THE WORLD.
+// =====================================================================
+/**
+ * The clash documented above is now closed, in favour of convention (A):
+ * src/world composes an exact quarter-turn rotation into every instance matrix,
+ * so a world turn is a true rigid rotation and the baked face tones travel with
+ * the geometry.
+ *
+ * WHY (A) AND NOT (B), ON ART GROUNDS FIRST
+ *
+ * The two conventions are not cosmetically equivalent, they say different
+ * things about what this scene IS.
+ *
+ *   (A) light fixed in the world  -> orbiting shows you the shadowed side of a
+ *       monument whose sun has not moved. It is a place.
+ *   (B) light fixed to the screen -> the key light follows the viewer's head.
+ *       Nothing casts light; the shading is a diagram's convention.
+ *
+ * (B) is the right answer for a direction whose thesis is "this is a
+ * screen-space trick". It is the wrong answer for "twilight monument", where
+ * the entire point of a rotation is that the far side of the thing was always
+ * there and always in shadow. So (A) is chosen for what it means, and the fact
+ * that it is also the cheap one is a bonus rather than the argument.
+ *
+ * WHAT (A) COSTS, STATED HONESTLY
+ *
+ * The apparent key direction alternates between the four static rotation
+ * states: the sun rakes the screen-right faces at turns 0 and 2 and the
+ * screen-left faces at turns 1 and 3, because the +-x and +-z face families
+ * exchange under a quarter turn. Every state is individually coherent — it is
+ * the same monument seen from another corner — but there is no single "the sun
+ * is over there" that holds across all four. That cost was accepted, and the
+ * palette was built to absorb it: BOTH side tones are plausible daylight
+ * (a saturated warm key and a saturated cool shadow, not a lit face and a black
+ * one), so no rotation state reads as broken. The `rot1`/`rot2`/`rot3` shots
+ * exist to prove that claim rather than to assert it.
+ *
+ * WHAT (B) WOULD HAVE COST, ALSO HONESTLY
+ *
+ * (B) is cheap to hold across a static world TURN (do nothing — the current
+ * bug is that it already behaves this way) and expensive to hold THROUGH THE
+ * ORBIT, which is where it actually has to hold: mid-orbit the camera is off
+ * axis and screen-space tone is not a function of any baked attribute. The two
+ * ways to buy it are a per-frame vertex-colour repaint of the box geometry
+ * (a per-frame CPU write to a shared BufferAttribute — allocation-free only if
+ * carefully done, and it destroys the "nothing writes buffers per frame"
+ * property) or a custom ShaderMaterial keying tone off the view-space normal
+ * (a SECOND SHADER PROGRAM, which is exactly the compile-stall failure mode
+ * ARCHITECTURE.md §6 exists to prevent). Neither was measured, because neither
+ * was going to be shipped for this direction — that is stated so the comparison
+ * is not read as a measured one.
+ *
+ * MEASURED CONSEQUENCE
+ *
+ * Commit frame vs last orbit frame, `hero` shot at 1600x1000, one +1 turn, via
+ * two isolated captures pumped to exactly frame 27 and frame 28 (the orbit runs
+ * 28 frames; at frame 27 `progress` is already exactly 1, so the last rendered
+ * orbit frame sits at a full 90 degrees and the identity applies exactly):
+ *
+ *   before (tones baked to world axes) ....  3.1891% of pixels, maxDelta 48
+ *   after  (convention A, this build) .....  0.0000% of pixels, maxDelta 0
+ *
+ * maxDelta 48 was exactly |faceLeft.r - faceRight.r| in the old palette, i.e.
+ * the whole residual was this convention; it is now zero. The rotation commit
+ * is pixel-clean, which is what the control capture predicted.
+ *
+ * The atmosphere added by this direction does NOT reopen it. Fog is keyed to
+ * view depth, and the orbit-equals-turn identity is a statement about the view
+ * matrix, so `-mvPosition.z` is identical on both sides of the swap by the same
+ * argument that makes the silhouette identical. That was the one thing about a
+ * camera-distance depth cue that had to be checked, and the 0.0000% above is
+ * the check.
+ */
+
 /** One quarter turn. */
 export const TURN_RADIANS = Math.PI / 2;
 
@@ -165,6 +343,156 @@ export const MAX_QUEUED_TURNS = 3;
 const ORBIT_AXIS = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
 const ORIGIN = /* @__PURE__ */ new THREE.Vector3(0, 0, 0);
 const _q = /* @__PURE__ */ new THREE.Quaternion();
+
+// =====================================================================
+//  FRAMING — composition is computed from the structure, not hand-tuned
+// =====================================================================
+/**
+ * WHY THIS EXISTS
+ *
+ * Every shot in this project used to be framed by a literal camera position and
+ * a literal frustum size, both guessed. The result was measurable and bad: at
+ * `hero` the structure's projected bounding box was 4.95 x 5.72 screen units
+ * inside a 25.6 x 16 frame — 19% of the width, 36% of the height — and its
+ * centre sat 1.77 units right of the frame centre, because the camera targeted
+ * (2.5,2.5,2.5) which projects to the ORIGIN's screen position rather than to
+ * the structure's. `rot1` was worse: rotation pivots at the world origin, which
+ * is loop-01's corner, so a quarter turn threw the whole structure into the top
+ * right of the frame.
+ *
+ * Hand-fixing eight camera positions would fix those eight numbers and nothing
+ * else. Instead the framing is DERIVED: project the level, take the bounding
+ * box in the camera's own screen basis, and solve for the camera pose that puts
+ * that box where the composition wants it. A new level, a new rotation state or
+ * a new aspect ratio is then framed correctly without anyone re-guessing.
+ *
+ * It is pure arithmetic on level data — no clock, no rng, no DOM read beyond
+ * the viewport size the renderer already reads — so it cannot affect
+ * determinism (ARCHITECTURE.md §1).
+ *
+ * WHY IT DOES NOT DISTURB THE ORBIT
+ *
+ * The solved pose is generally NOT on the (1,1,1) diagonal: it is the diagonal
+ * plus a shift perpendicular to the view direction, which is what panning is
+ * for an orthographic camera. The orbit identity survives that untouched,
+ * because `view = (R^-1 C)^-1 = C^-1 R` holds for ANY camera pose C — the orbit
+ * rotates the whole pose rigidly about the world origin, and the origin is
+ * still the axis `rotateY` uses. What must NEVER happen is re-framing on
+ * `world/rotated`: that would move the camera on the commit frame and turn a
+ * provably clean swap into a jump. Framing happens on `level/loaded` and in dev
+ * shots, and nowhere else.
+ */
+
+/** View direction of the canonical isometric camera (camera -> scene). */
+export const ISO_VIEW_DIR = /* @__PURE__ */ Object.freeze([-1, -1, -1]);
+
+const _f = /* @__PURE__ */ new THREE.Vector3();
+const _z = /* @__PURE__ */ new THREE.Vector3();
+const _r = /* @__PURE__ */ new THREE.Vector3();
+const _u = /* @__PURE__ */ new THREE.Vector3();
+const _UP = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
+
+/**
+ * The orthonormal camera basis for a view direction, as three fresh vectors.
+ *
+ * Matches THREE's own `Matrix4.lookAt` convention exactly (x = up cross z,
+ * y = z cross x), which is what makes a pose solved here identical to the pose
+ * `camera.lookAt` produces. For the isometric direction it comes out as
+ * right = (1,0,-1)/sqrt2 and up = (-1,2,-1)/sqrt6, i.e. literally the basis
+ * src/geometry derives its screen invariant from.
+ */
+export function viewBasis(dir = ISO_VIEW_DIR) {
+  const forward = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize();
+  const z = forward.clone().negate();
+  const right = new THREE.Vector3().crossVectors(_UP, z);
+  if (right.lengthSq() < 1e-12) throw new Error('[render] viewBasis: direction is parallel to up');
+  right.normalize();
+  return { right, up: new THREE.Vector3().crossVectors(z, right), forward };
+}
+
+/**
+ * Solve for an orthographic camera pose that frames `points`.
+ *
+ * @param {number[][]} points   world-space centres of unit cells
+ * @param {object} opts
+ * @param {number[]} opts.dir   view direction, camera -> scene
+ * @param {number} opts.aspect  viewport width / height
+ * @param {number} opts.fill    fraction of the frame the box should occupy
+ * @param {number} opts.cx      where the box centre lands, 0 = left, 1 = right
+ * @param {number} opts.cy      where the box centre lands, 0 = top, 1 = bottom
+ * @param {number} opts.extent  half-size of each cell, world units
+ * @returns {{position:number[], target:number[], frustumSize:number,
+ *            box:{w:number,h:number}}}
+ *
+ * Pure: allocates nothing the caller can see and touches no engine state, so it
+ * is unit-testable with no renderer and no DOM.
+ *
+ * The cell half-extent is expanded ANALYTICALLY rather than by projecting eight
+ * corners each: the projection is linear, so the widest a cube can push its
+ * centre's screen position is `extent * (|r.x| + |r.y| + |r.z|)`, the L1 norm of
+ * the screen basis vector. For the isometric basis that is 0.7071 across and
+ * 0.8165 up, which is the exact half-width and half-height of the hexagon a
+ * unit cube projects to.
+ */
+export function fitView(points, {
+  dir = ISO_VIEW_DIR, aspect = 1.6, fill = 0.78, cx = 0.5, cy = 0.5, extent = 0.5,
+} = {}) {
+  if (!Array.isArray(points) || points.length === 0) {
+    throw new Error('[render] fitView needs at least one point to frame');
+  }
+
+  const f = _f.set(dir[0], dir[1], dir[2]).normalize();
+  const z = _z.copy(f).negate();
+  // Camera +X. Degenerate only for a straight-down view, which nothing here
+  // uses; fail loudly rather than silently producing a NaN pose.
+  const r = _r.crossVectors(_UP, z);
+  if (r.lengthSq() < 1e-12) throw new Error('[render] fitView: view direction is parallel to up');
+  r.normalize();
+  const u = _u.crossVectors(z, r);
+
+  const padX = extent * (Math.abs(r.x) + Math.abs(r.y) + Math.abs(r.z));
+  const padY = extent * (Math.abs(u.x) + Math.abs(u.y) + Math.abs(u.z));
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of points) {
+    const X = p[0] * r.x + p[1] * r.y + p[2] * r.z;
+    const Y = p[0] * u.x + p[1] * u.y + p[2] * u.z;
+    if (X < minX) minX = X;
+    if (X > maxX) maxX = X;
+    if (Y < minY) minY = Y;
+    if (Y > maxY) maxY = Y;
+  }
+  const w = (maxX - minX) + 2 * padX;
+  const h = (maxY - minY) + 2 * padY;
+
+  // Vertical frustum that satisfies `fill` on BOTH axes — whichever axis is
+  // tighter wins, so `fill` is a floor on how much of the frame is used and
+  // never an overflow.
+  const F = Math.max(h / fill, w / (fill * aspect));
+  const W = F * aspect;
+
+  // Where the box centre must sit in camera screen coords for it to land at
+  // (cx, cy) in the frame. y is up, cy is measured from the top.
+  const sx = (cx - 0.5) * W;
+  const sy = (0.5 - cy) * F;
+  const mX = (minX + maxX) / 2;
+  const mY = (minY + maxY) / 2;
+
+  // Screen X of a point p is dot(p - P, r), so P.dot(r) = mX - sx puts the box
+  // centre exactly where the composition asked. (r, u, f) is orthonormal, so
+  // the pose is just the sum of its three components. The f component is pinned
+  // to ORIGIN_DEPTH, which is what keeps the haze band identical in every shot.
+  const px = r.x * (mX - sx) + u.x * (mY - sy) - f.x * ORIGIN_DEPTH;
+  const py = r.y * (mX - sx) + u.y * (mY - sy) - f.y * ORIGIN_DEPTH;
+  const pz = r.z * (mX - sx) + u.z * (mY - sy) - f.z * ORIGIN_DEPTH;
+
+  return {
+    position: [px, py, pz],
+    target: [px + f.x, py + f.y, pz + f.z],
+    frustumSize: F,
+    box: { w, h },
+  };
+}
 
 /**
  * Smootherstep, 6u^5 - 15u^4 + 10u^3. Zero first AND second derivative at both
@@ -290,16 +618,46 @@ export default {
 
     this.scene = new THREE.Scene();
 
+    /**
+     * ATMOSPHERE. Linear fog, set BEFORE any material exists, because fog is a
+     * compile-time define on the shader: enabling it after first render would
+     * recompile every material mid-play, which is the exact stall
+     * ARCHITECTURE.md §6 exists to catch. Both meshes in this project use the
+     * same MeshBasicMaterial{vertexColors} parameter set, so they still share
+     * ONE program with fog on — verified by tools/profile.mjs, not assumed.
+     *
+     * Fog is also the only "post" in the project and it is not temporal, so
+     * resetTemporal() has nothing extra to drop.
+     */
+    this.scene.fog = new THREE.Fog(PALETTE.haze, FOG_NEAR, FOG_FAR);
+
     // True isometric: orthographic projection with the camera on the (1,1,1)
     // diagonal gives equal foreshortening on all three axes, which is the
     // precondition for the projection-collapse trick the geometry subsystem
     // will rely on.
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    this.camera.position.set(30, 30, 30);
+    this.camera.position.set(40, 40, 40);
     this.camera.lookAt(0, 0, 0);
     this.frustumSize = 26;
 
     this._initTransitions(ctx);
+
+    /**
+     * Frame the live camera once the level is known.
+     *
+     * Subscribed HERE rather than in _initTransitions() because framing needs a
+     * viewport and a renderer, and _initTransitions is deliberately DOM-free so
+     * src/render/camera.test.js can drive the real wiring in node.
+     *
+     * The live view is framed on the UNION of all four rotation states, not on
+     * the state it happens to be in. Framing turns 0 tightly would look better
+     * for one second and then throw the structure into a corner the first time
+     * the player presses Q, because rotation pivots at the world origin and
+     * loop-01's origin is its corner. A frame that holds all four is the honest
+     * composition for a view you can rotate. Dev shots do the opposite and
+     * frame each state tightly, because each of those is a still.
+     */
+    ctx.on('level/loaded', (level) => this._frameLevel(level));
 
     this._resize();
     this._onResize = () => this._resize();
@@ -307,6 +665,87 @@ export default {
 
     ctx.engine.scene = this.scene;
     ctx.engine.camera = this.camera;
+  },
+
+  // ---------------------------------------------------------------- framing
+
+  /** Viewport aspect, from the same source _resize uses. */
+  _aspect() {
+    const w = globalThis.innerWidth || 1600;
+    const h = globalThis.innerHeight || 1000;
+    return h > 0 ? w / h : 1.6;
+  },
+
+  /**
+   * Apply a solved framing to the live camera. `points` are world-space cell
+   * centres; see fitView for the options.
+   */
+  frameCamera(points, opts = {}) {
+    const fit = fitView(points, { aspect: this._aspect(), ...opts });
+    this.camera.position.set(...fit.position);
+    this.camera.lookAt(...fit.target);
+    this.frustumSize = fit.frustumSize;
+    this._resize();
+    return fit;
+  },
+
+  /**
+   * Frame the live camera on a level across every rotation state it can be in.
+   *
+   * TWO REQUIREMENTS THAT PULL AGAINST EACH OTHER
+   *
+   * The live view is not a still. It must (a) never let a rotation throw the
+   * structure off screen, which argues for framing the UNION of the four
+   * states, and (b) look composed in the state the player is actually in most
+   * of the time, which is turns 0 — the state every level opens in and, for
+   * loop-01, the only one it is solvable in. Framing the union alone satisfies
+   * (a) and fails (b) badly: loop-01's union is dominated by the rotated states
+   * (rotation pivots at the world origin, which is the structure's corner), so
+   * the home state renders 69% of the way down the frame and off to one side.
+   *
+   * So: SIZE from the union, AIM biased toward home by exactly as much as the
+   * union's leftover margin allows. Nothing can leave the frame — the bias is
+   * clamped to the slack, by construction — and the home state comes back to
+   * 56% down instead of 69%. That is the composition doing real work rather
+   * than a number someone liked.
+   *
+   * Rotating the cell list here rather than asking src/world for its instance
+   * matrices keeps this a pure function of level DATA, so the live camera
+   * cannot end up framed against a stale draw state.
+   */
+  _frameLevel(level, { fill = 0.70 } = {}) {
+    const cells = level?.cells;
+    if (!Array.isArray(cells) || cells.length === 0) return null;
+
+    const every = [];
+    for (let t = 0; t < 4; t++) {
+      for (const [x, y, z] of cells) every.push(rotateY([x, y, z], t));
+    }
+
+    const aspect = this._aspect();
+    // `fill` is deliberately looser than the stills use. A camera orbit sweeps
+    // CONTINUOUSLY between two of the four states and bulges slightly outside
+    // the union of them at 45 degrees, so the union needs headroom that a still
+    // does not.
+    const spread = fitView(every, { aspect, fill });
+    const home = fitView(cells, { aspect, fill });
+
+    const { right, up, forward } = viewBasis();
+    const F = spread.frustumSize;
+    const slackX = Math.max(0, (F * aspect - spread.box.w) / 2);
+    const slackY = Math.max(0, (F - spread.box.h) / 2);
+
+    const P = new THREE.Vector3(...spread.position);
+    const d = new THREE.Vector3(...home.position).sub(P);
+    const clamp = (v, m) => Math.max(-m, Math.min(m, v));
+    P.addScaledVector(right, clamp(d.dot(right), slackX))
+      .addScaledVector(up, clamp(d.dot(up), slackY));
+
+    this.camera.position.copy(P);
+    this.camera.lookAt(P.x + forward.x, P.y + forward.y, P.z + forward.z);
+    this.frustumSize = F;
+    this._resize();
+    return { position: P.toArray(), frustumSize: F };
   },
 
   /**

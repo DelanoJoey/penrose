@@ -44,18 +44,47 @@ const HOP = 0.15;
  */
 const CLEARANCE = 3;
 
-/** Pawn dimensions and its three face tones — accent-family, mint. */
+/**
+ * Pawn dimensions and its face tones.
+ *
+ * ART DIRECTION "dusk": THE PAWN IS THE ONLY THING IN THE SCENE THAT EMITS.
+ *
+ * The monument is stone raked by a single low warm sun; the pawn is a cold
+ * lantern standing on it. That is the whole colour logic of the direction in
+ * one object — warm family = the place, cool family = the player — and it is
+ * why these tones are the brightest values in any frame (top ~246 against the
+ * sun-struck stone's 221) while being the coolest hues in it.
+ *
+ * ITS TWO SIDE TONES ARE DELIBERATELY EQUAL, AND THAT IS A CONVENTION FIX.
+ *
+ * src/world now composes a rotation into its instance matrices, so the level's
+ * face tones travel with the world: the key light is fixed IN THE WORLD (see
+ * the long note in src/render). The pawn's mesh is never rotated — its
+ * transform stays identity by design, so its bounding sphere and its culling
+ * stay honest — which means a left/right tone split on it would stay glued to
+ * the SCREEN and contradict the world's convention in every rotated view: the
+ * monument lit from screen-left at turns 1 with the pawn still lit from
+ * screen-right.
+ *
+ * Giving it no left/right distinction removes the contradiction without
+ * touching its transform, and it is the physically correct shading for the
+ * thing it is: a light source has no key direction. The top stays a little
+ * brighter than the sides so the form still reads, but not brightly enough to
+ * imply a sun. The pawn is therefore convention-free — it looks the same under
+ * either answer to the tone question, and contributes exactly 0 to the commit
+ * frame delta.
+ *
+ * Deliberately NOT imported from src/render — ARCHITECTURE.md §3.3 forbids
+ * subsystems importing each other, and src/geometry is the only permitted
+ * direct reach.
+ */
 const AVATAR = {
   height: 0.8,
   radiusBottom: 0.34,
   radiusTop: 0.22,
-  /** Matching src/render's convention: up-facing gets the light tone, the two
-   *  horizontal axes get the mid and dark tones. Deliberately NOT imported from
-   *  src/render — ARCHITECTURE.md §3.3 forbids subsystems importing each other,
-   *  and src/geometry is the only permitted direct reach. */
-  top: 0xdefff7,
-  left: 0x5fc9ba,
-  right: 0x3f9a92,
+  top: 0xdcfff6,
+  left: 0x7ae4d6,
+  right: 0x7ae4d6,
 };
 
 // ---------------------------------------------------------------- mesh build
