@@ -29,6 +29,20 @@ jobs:
       - name: Install chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Unit tests
+        run: npm test
+
+      # A level with no impossible edges is an ordinary staircase, and one
+      # solvable in every rotation does not use its own mechanic. Both are
+      # design regressions that no pixel diff would catch, so they are asserted
+      # here instead. tools/analyze.mjs exits non-zero on either.
+      - name: Level design asserts
+        run: |
+          for level in loop-01 probe-01; do
+            echo "--- $level"
+            node tools/analyze.mjs "$level"
+          done
+
       - name: Build
         run: npx vite build
 
