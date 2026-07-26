@@ -126,7 +126,9 @@ engine state.
 | `player/blocked` | `player` | `{ from, direction }` — attempted a step with no edge |
 | `world/rotate-request` | `ui` | `{ delta }` — signed quarter turns *requested*. `src/render` performs the orbit and commits the world rotation on the frame the camera arrives; `world/rotated` follows. Nothing else may rotate the world from input. |
 | `world/rotated` | `world` | `{ from, to }` — quarter-turn indices |
+| `level/load-request` | `campaign` | `{ name }` or a bare string — asks `world` to swap levels at runtime. Same shape as `world/rotate-request`: the asker decides *when*, `world` decides *how*. Nothing else may change the level. |
 | `level/loaded` | `world` | `{ name, cells, start, goal }` |
+| `campaign/complete` | `campaign` | `{ levels }` — the last level in `ORDER` was solved. Emitted once; a further solve is ignored. |
 | `level/solved` | `player` | `{ moves, turns }` — `turns` is the number of quarter-turns the player *spent* on this level, a solve statistic alongside `moves`. It is **not** the current rotation index; read that from `ctx.peek('world').turns`. |
 
 **An event may not carry a timestamp.** Anything time-derived must be read from
