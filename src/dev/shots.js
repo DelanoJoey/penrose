@@ -56,5 +56,46 @@ export function makeShots(ctx) {
 
     /** Two quarter turns. */
     rot2: iso(40, 18, 2),
+
+    /**
+     * Three quarter turns, with the avatar. The fourth rotation state was the
+     * only one no shot covered, and it is also the cheapest place to catch an
+     * avatar whose placement depends on rotation: the avatar's occlusion bias
+     * is recomputed per rotation, so a rotation-dependent bug in it shows here
+     * and nowhere else in the set.
+     */
+    rot3: iso(40, 18, 3),
+
+    /**
+     * Tight on the avatar at the level's start cell.
+     *
+     * This is the one shot that magnifies the avatar's VIEW BIAS. At the start
+     * cell the avatar is pushed 5 lattice steps along (1,1,1) to clear the
+     * walkway block that aliases it; that translation is a screen no-op only
+     * because the projection collapses the view diagonal exactly. If the camera
+     * basis, the frustum maths or the bias rule ever drift apart, the avatar
+     * moves on screen — invisible at 16 units of frustum, obvious at 6.
+     *
+     * lookAt is the avatar's TRUE cell (1,1,0), not its biased draw position,
+     * which is the assertion: those two must project to the same point.
+     */
+    avatar: place([40, 40, 40], 6, [1, 1, 0]),
+
+    /**
+     * The avatar partway along the level, on the upper walkway rather than at
+     * the start. Placed with `player.placeAt`, which settles instantly and
+     * emits nothing — a shot may not start an animation, so `step()` is not an
+     * option here. Bias is 0 at this cell, so this frames the avatar drawn at
+     * its honest position, which the start-cell shot deliberately does not.
+     */
+    avatarmid: () => {
+      ctx.peek('world')?.setRotation(0);
+      ctx.peek('player')?.placeAt('5,5,2');
+      cam.position.set(40, 40, 40);
+      cam.lookAt(5, 6, 2);
+      const render = ctx.peek('render');
+      render.frustumSize = 11;
+      render._resize();
+    },
   };
 }

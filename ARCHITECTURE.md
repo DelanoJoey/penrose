@@ -124,9 +124,10 @@ engine state.
 |---|---|---|
 | `player/moved` | `player` | `{ from, to, viaIllusion }` — cell ids; `viaIllusion` is true when the edge was not 3D-adjacent |
 | `player/blocked` | `player` | `{ from, direction }` — attempted a step with no edge |
+| `world/rotate-request` | `ui` | `{ delta }` — signed quarter turns *requested*. `src/render` performs the orbit and commits the world rotation on the frame the camera arrives; `world/rotated` follows. Nothing else may rotate the world from input. |
 | `world/rotated` | `world` | `{ from, to }` — quarter-turn indices |
 | `level/loaded` | `world` | `{ name, cells, start, goal }` |
-| `level/solved` | `player` | `{ moves, turns }` |
+| `level/solved` | `player` | `{ moves, turns }` — `turns` is the number of quarter-turns the player *spent* on this level, a solve statistic alongside `moves`. It is **not** the current rotation index; read that from `ctx.peek('world').turns`. |
 
 **An event may not carry a timestamp.** Anything time-derived must be read from
 `ctx.time` at the point of use, or the payload becomes a nondeterminism channel.

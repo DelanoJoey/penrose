@@ -250,6 +250,84 @@ fails the build — neither is catchable by a pixel diff.
 
 ---
 
+## P2 — avatar, HUD, audio, rotation transitions
+
+### Corrections to the P1 record above
+
+Two of the three deferred items are closed, and the third is closed in one
+direction only. Stated here rather than edited into P1, so the record of what
+was believed when still reads straight:
+
+- **"The avatar does not exist yet"** is now false. `src/player` walks the path
+  graph, resolving every edge through `Structure.pathGraph(turns)` and every
+  illusion classification through `Structure.impossibleEdges(turns)` — the same
+  calls `tools/analyze.mjs` makes, so the avatar cannot disagree with the
+  analyser about what the level is. Verified end to end under lockstep: from
+  `1,0,0` a single `-x` screen step lands on `5,5,5`, emitting
+  `player/moved{viaIllusion:true}` and `level/solved{moves:1,turns:0}`. That is
+  a 14-unit Manhattan jump rendered as one ordinary sideways step.
+- **"Rotation is discrete state with no transition"** is now half true. The
+  camera orbit exists (`src/render`, `CameraOrbit`), is bound to Q/E through
+  `world/rotate-request`, and is proven by 24 unit tests including the
+  orbit-equals-turn identity with its negative controls. The world is still
+  never interpolated — only the camera moves, which was the requirement.
+- Camera framing is still off-centre, still deferred, and now has a second
+  consequence: `rotateY` pivots at the world origin, which is loop-01's corner,
+  so the structure swings toward the frame edge at mid-orbit. The orbit pivot
+  and the world's rotation axis must stay the same axis; `render.orbitPivot`
+  exists so they can be moved together when the art pass re-centres.
+
+### Deferred out of P2, with the reason
+
+- **The rotation commit frame carries a face-tone swap** (~3.1% of pixels,
+  maxDelta 48 = `|faceLeft.r - faceRight.r|`). `paintByNormal` bakes tone onto
+  *world*-space normals and `src/world._applyRotation` writes translation-only
+  instance matrices, so a world turn keeps tone fixed to the screen while a
+  camera orbit carries tone around with the geometry. The two conventions
+  disagree only at the commit. Both are internally coherent — "the light is
+  fixed in the world and the viewpoint moved" versus "the light is fixed to the
+  screen and the world moved" — and choosing between them changes the static
+  look of every rotated view. That is an art-direction decision with a required
+  reference re-capture (§5), not an integration decision, so it is left open.
+  The measurement that isolates it: with the two side tones set equal and the
+  avatar hidden, the last orbit frame and the commit frame are **identical, max
+  delta 0** — so the camera-orbit-equals-world-turn identity itself is exact
+  through the real renderer, and the residual is entirely this convention clash.
+- **The avatar's view bias is still visible in the static off-axis shot.** At
+  the start cell the avatar is pushed 5 lattice steps along `(1,1,1)` so it wins
+  the depth test against a walkway block 12 units nearer; that translation is a
+  screen no-op *only* under exact isometric projection. In `offaxis.png` the
+  avatar therefore sits about 90 px from where its cell projects. Without the
+  bias the avatar is 100% invisible on the frame the level opens on, so the
+  alternatives are a real choice (depth-test override, render order, or
+  accepting the displacement) and not a bug fix. Left as chosen, measured and
+  disclosed. The new `avatar` shot frames the start cell at frustum 6
+  specifically so the on-axis cancellation is checked at magnification on every
+  gate run.
+
+  What was **not** left alone is the same bias during a rotation orbit, because
+  binding Q/E to the transition made it move: measured at the commit frame,
+  3.32% of pixels changed with maxDelta 228 and the avatar visibly crossed the
+  screen. `src/player` now polls `ctx.peek('render').transitionState().active`
+  and takes a bias of 0 for the duration of an orbit. After that change the
+  commit frame is 3.19% / maxDelta 48 — 48 being exactly
+  `|faceLeft.r - faceRight.r|`, i.e. the whole remaining residual is the tone
+  convention above and none of it is the avatar. The price, measured by counting
+  avatar-toned pixels frame by frame: at the start cell the avatar is honestly
+  occluded for the first 6 frames of the orbit (100 ms) before the camera moves
+  far enough off-axis to separate it from the walkway. At the other 9 standable
+  cells in loop-01 the bias was already 0 and nothing changes at all.
+- **Audio waveform output is not bit-reproducible when three or more voices
+  sum.** Isolated to Blink's mixer, not to project code: a control using bare
+  Web Audio and none of `src/audio` reproduces it at three summed connections
+  and above, while every individual voice renders bit-identical. IEEE-754
+  addition is not associative, so the sum depends on the order the connections
+  are iterated. It cannot reach the gate — audio constructs no `AudioContext` at
+  all in capture mode (measured: constructor call count 0 across a full capture,
+  including after emitting every gameplay event).
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
