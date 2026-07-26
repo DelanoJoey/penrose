@@ -146,6 +146,110 @@ until then.
 
 ---
 
+## P1 — isometric projection and the impossible-geometry path graph
+
+**Completed 2026-07-25.** Single sequential owner, not fanned out, per
+`ARCHITECTURE.md` §3.3 — projection, visibility and traversal are one coupled
+system.
+
+### The result
+
+The whole subsystem rests on one fact. In an orthographic projection viewed
+along (1,1,1), the points `(x,y,z)` and `(x+t,y+t,z+t)` project to the *same*
+screen point. So
+
+```
+a = x - z        b = x + z - 2y
+```
+
+is a **complete invariant of screen position** — two cells overlap on screen if
+and only if they share `(a,b)`. Exact integer arithmetic on a lattice: no float
+comparison, no epsilon, and therefore no nondeterminism.
+
+Every impossible connection is a consequence rather than a special case.
+Stepping `+x` changes `(a,b)` by `(+1,+1)`; stepping `+y` changes it by `(0,-2)`;
+their sum is `(+1,-1)`, which is exactly the change from stepping `-z`. "Walk one
+east and climb one" is therefore indistinguishable on screen from "walk one
+north" — the Penrose staircase, falling out of the algebra.
+
+The traversal graph is built from **visual** adjacency, not 3D adjacency. That
+inversion is the mechanic: an edge exists because two platforms *look* next to
+each other. Occlusion is resolved by depth `x+y+z`, and ties are impossible —
+two distinct cells sharing a screen position differ by a nonzero multiple of
+(1,1,1), so their depths differ by exactly `3t`.
+
+Rendering `loop-01` produced a **Penrose triangle**. It was not modelled; three
+legs along `+x`, `+y`, `+z` with net displacement `(5,5,5)` produce the tribar
+automatically, because the net is a multiple of the view direction and therefore
+closes on screen.
+
+### The first level design was wrong, and the analyser caught it
+
+`loop-01` was originally a climbing flight (`+x,+y`) plus a flat walkway (`+z`).
+The algebra was correct — net displacement `(5,5,5)`, ends aliased — but the
+picture was not. Running `tools/analyze.mjs`:
+
+```
+turns 0:  visible 6 / 11 cells,  impossibleEdges 0,  pathLength null
+solvableTurns: [3]
+```
+
+The two legs' screen deltas are `(+1,-1)` and `(-1,+1)` — exact inverses — so the
+return leg retraced the outbound leg pixel for pixel instead of forming a loop.
+Eleven cells collapsed to six visible positions and the illusion did not exist.
+
+Rebuilt with three legs along `+x`, `+y`, `+z`, whose screen directions
+`(+1,+1)`, `(0,-2)`, `(-1,+1)` are all distinct:
+
+```
+turns 0:  visible 15 / 16 cells,  impossibleEdges 2,  pathLength 2
+solvableTurns: [0],  requiresRotation: true
+illusionEdge: 1,0,0 -> 5,5,5   manhattan 14
+```
+
+The solution is a **single step across a gap of 14 units in 3D**. Solvable only
+at rotation 0, so rotation is load-bearing.
+
+This is the argument for having the analyser at all. The failure was invisible in
+the code, invisible in the tests (the math was right), and would have been
+invisible in a pixel diff (the render was self-consistent). Only a tool that
+asks *"does this level's premise actually hold"* catches it.
+
+### Verification
+
+| check | result |
+|---|---|
+| `npm test` | 18/18 pass, exit 0 |
+| `node tools/analyze.mjs loop-01` | solvable, illusion load-bearing, exit 0 |
+| `npx vite build` | exit 0 |
+| `node tools/gate.mjs` | `identical: true` across 6 shots, exit 0 |
+
+The off-axis shot is the proof the geometry is honest: viewed off the isometric
+axis, the loop visibly fails to close and the three legs float apart. Nothing is
+faked — the projection does all of the work.
+
+One test bug was found and fixed during this phase: the lattice-parity assertion
+compared `(a+b) % 2` to `0`, but `-6 % 2` is `-0` in JavaScript and strict
+equality distinguishes the two. The property held; the assertion was wrong.
+
+### Added to CI
+
+`npm test` and the level design asserts now run on every PR alongside the pixel
+gate. A level with no impossible edges, or one solvable in all four rotations,
+fails the build — neither is catchable by a pixel diff.
+
+### Known items, deliberately deferred
+
+- Camera framing is off-centre in every shot. Cosmetic; belongs to the art pass.
+- Rotation is discrete state with no transition. Interpolating cell positions
+  between rotation states would place them at non-integer coordinates where the
+  screen-position invariant does not hold; animating the **camera** between the
+  four states is the correct approach and belongs to P2.
+- The avatar does not exist yet. The path graph is proven by unit test and by
+  `tools/analyze.mjs`, not by anything walking it.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted

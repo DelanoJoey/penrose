@@ -28,6 +28,8 @@ export function makeConfig(search = globalThis.location?.search ?? '') {
     lockstep: flag('lockstep'),
     /** Named shot to apply at boot, if any. */
     shot: p.get('shot') ?? null,
+    /** Named level to load. Falls back to the default if unknown. */
+    level: p.get('level') ?? null,
     /** Seed for every rng fork. Fixed by default — never seed from time. */
     seed: p.get('seed') ?? 'penrose',
     quality,

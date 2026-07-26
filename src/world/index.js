@@ -1,87 +1,86 @@
 import * as THREE from 'three';
 import { paintByNormal, PALETTE } from '../render/index.js';
+import { Structure, rotateY, cellId } from '../geometry/index.js';
+import { LEVELS, DEFAULT_LEVEL } from './levels.js';
 
 /**
- * P0 stub scene.
+ * Draws a level.
  *
- * A rising staircase loop, built HONESTLY — it genuinely climbs, so the ends do
- * not meet. Making the ends meet in projection while staying disjoint in 3D is
- * the actual problem, and it belongs to src/geometry in P1. Faking it here
- * would hide the work rather than do it.
- *
- * The purpose of this scene is to give the pixel gate something non-trivial to
- * be identical about: instanced geometry, three-tone face colour, hard silhouette
- * edges against the clear colour, and MSAA on every one of those edges.
+ * This subsystem owns geometry placement and nothing else. It does not decide
+ * what is visible or what connects — src/geometry does, from the level data, and
+ * this reads the answer. Keeping that split means a level's solvability can be
+ * checked (tools/analyze.mjs) without a renderer existing at all.
  */
 
-const STEP = 1.0;      // horizontal run per step
-const RISE = 0.42;     // vertical rise per step
-const PER_SIDE = 7;    // steps per side of the loop
+const CELL = 1.0;
 
 export default {
   name: 'world',
 
   async init(ctx) {
-    const rng = ctx.rng.fork('world/stub');
+    const name = ctx.config.level && LEVELS[ctx.config.level] ? ctx.config.level : DEFAULT_LEVEL;
+    this.level = LEVELS[name];
+    this.structure = new Structure(this.level.cells);
+    this.turns = 0;
 
-    const box = paintByNormal(new THREE.BoxGeometry(STEP, RISE * 2.2, STEP));
+    const box = paintByNormal(new THREE.BoxGeometry(CELL, CELL, CELL));
     const material = new THREE.MeshBasicMaterial({ vertexColors: true });
 
-    const placements = [];
+    this.mesh = new THREE.InstancedMesh(box, material, this.level.cells.length);
+    this.mesh.frustumCulled = false;
 
-    // --- rising loop -----------------------------------------------------
-    // Four sides, turning left at each corner, climbing the whole way.
-    const dirs = [
-      [1, 0], [0, 1], [-1, 0], [0, -1],
-    ];
-    let x = -PER_SIDE / 2, z = -PER_SIDE / 2, y = 0;
+    // instanceColor multiplies the geometry's per-face vertex colours, so white
+    // leaves the three-tone read intact and a tint marks a cell without
+    // introducing a second material or a second draw call.
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(this.level.cells.length * 3).fill(1), 3);
 
-    for (let side = 0; side < 4; side++) {
-      const [dx, dz] = dirs[side];
-      for (let i = 0; i < PER_SIDE; i++) {
-        placements.push([x, y, z]);
-        x += dx * STEP;
-        z += dz * STEP;
-        y += RISE;
-      }
-    }
+    this._applyRotation();
+    ctx.engine.scene.add(this.mesh);
 
-    // --- base platform ---------------------------------------------------
-    const half = PER_SIDE / 2 + 1;
-    for (let px = -half; px <= half; px++) {
-      for (let pz = -half; pz <= half; pz++) {
-        placements.push([px * STEP, -RISE * 3, pz * STEP]);
-      }
-    }
+    ctx.engine.level = this.level;
+    ctx.engine.structure = this.structure;
+  },
 
-    // --- floating accents ------------------------------------------------
-    // Deterministic: every value comes from the forked stream, never Math.random.
-    for (let i = 0; i < 9; i++) {
-      placements.push([
-        rng.range(-9, 9),
-        rng.range(4, 11),
-        rng.range(-9, 9),
-      ]);
-    }
-
-    const mesh = new THREE.InstancedMesh(box, material, placements.length);
+  /**
+   * Rebuild instance transforms for the current rotation.
+   *
+   * Rotation is a discrete state, not an animation — the geometry subsystem's
+   * whole model is integer lattice positions, and interpolating between them
+   * would put cells at non-integer coordinates where the screen-position
+   * invariant does not hold. Animating the CAMERA between the four states is
+   * the correct way to make this feel continuous, and belongs to P2.
+   */
+  _applyRotation() {
     const m = new THREE.Matrix4();
-    placements.forEach(([px, py, pz], i) => {
-      m.makeTranslation(px, py, pz);
-      mesh.setMatrixAt(i, m);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.frustumCulled = false;
+    const startId = cellId(...this.level.start);
+    const goalId = cellId(...this.level.goal);
+    const accent = new THREE.Color(PALETTE.accent);
 
-    this.mesh = mesh;
-    this.instanceCount = placements.length;
-    ctx.engine.scene.add(mesh);
+    this.level.cells.forEach((cell, i) => {
+      const [x, y, z] = rotateY(cell, this.turns);
+      m.makeTranslation(x * CELL, y * CELL, z * CELL);
+      this.mesh.setMatrixAt(i, m);
+
+      const id = cellId(...cell);
+      const tint = (id === startId || id === goalId) ? accent : null;
+      this.mesh.instanceColor.setXYZ(i, tint ? tint.r : 1, tint ? tint.g : 1, tint ? tint.b : 1);
+    });
+
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.instanceColor.needsUpdate = true;
+  },
+
+  setRotation(turns) {
+    this.turns = ((turns % 4) + 4) % 4;
+    this._applyRotation();
+    return this.turns;
   },
 
   update(ctx) {
-    // Intentionally static in P0. Any motion added here MUST be driven from
-    // ctx.time (ARCHITECTURE.md §1) — a wall-clock rotation would make every
-    // capture in this repository non-reproducible.
+    // Static. Any motion added here MUST be driven from ctx.time
+    // (ARCHITECTURE.md §1) — a wall-clock rotation would make every capture in
+    // this repository non-reproducible.
   },
 
   dispose() {

@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",
+    "test": "node --test \"test/*.test.js\"",
+    "analyze": "node tools/analyze.mjs",
     "baseline": "node tools/baseline.mjs",
     "diff": "node tools/imagediff.mjs",
     "profile": "node tools/profile.mjs",
