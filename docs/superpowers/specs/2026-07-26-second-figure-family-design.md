@@ -58,10 +58,17 @@ stage. Everything cheap belongs in front of it.
 | four legs, net a positive multiple of `(1,1,1)`, legs 1..6 | 810 | computed |
 | no repeated 3D cell | 810 | computed |
 | at least one illusion edge | 440 | computed |
+| ≥8 distinct screen cells | 400 | computed |
 | **encloses a hole on screen** | 330 | computed — new |
 | non-degenerate: min leg 2, doubles back on an axis, ≥9 screen cells, ≤20 cells | 102 | computed — new |
 | hosts a strong-premise route once augmented | 102 | computed |
 | **reads as an impossible figure** | human | judged last |
+
+The counts form a genuine chain: the non-degeneracy stage is strictly stronger
+than the one above it on every axis (≥9 vs ≥8 screen cells, min leg 2 vs 1), so
+102 is a subset of 330 rather than a separately-scoped measurement.
+`tools/search.mjs` (§7) prints all six numbers, so any future drift is a visible
+diff rather than an argument.
 
 ### 2.1 The hole criterion
 
