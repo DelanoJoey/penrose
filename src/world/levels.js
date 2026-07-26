@@ -40,6 +40,13 @@ function loop01(n = 5) {
     // leg, where it is actually visible.
     start: [1, 0, 0],
     goal: [n, n, n],
+    /**
+     * MEASURED, not aspirational. loop-01 is solvable in one move in the
+     * rotation it opens in -- `turn: false` is the honest declaration, and
+     * saying so out loud is what stopped this being mistaken for a level that
+     * uses its own mechanic. See tools/analyze.mjs.
+     */
+    premise: { turn: false, illusion: true },
   };
 }
 
@@ -53,6 +60,7 @@ function probe01() {
     cells: [[0, 0, 0], [4, 3, 3]],
     start: [0, 0, 0],
     goal: [4, 3, 3],
+    premise: { turn: false, illusion: true },
   };
 }
 
