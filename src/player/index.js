@@ -174,6 +174,7 @@ export default {
       if (this.mesh) {
         this.mesh.visible = true;
         this._settle();
+        this._orientToWorld();
       }
     });
 
@@ -186,6 +187,7 @@ export default {
       // in-flight step is completed instantly instead.
       this._cancelMove();
       this._settle();
+      this._orientToWorld();
     });
   },
 
@@ -262,6 +264,25 @@ export default {
     this._cancelMove();
     this._settle();
     return true;
+  },
+
+  /**
+   * Turn the pawn with the world, so its face tones follow the same convention
+   * the level kit does (LIGHT FIXED IN THE WORLD — see src/world/_applyRotation).
+   *
+   * Without this the avatar would be the last object in the scene still keyed to
+   * the screen, and it alone would put a tone swap back on the commit frame that
+   * the world fix just removed.
+   *
+   * The pawn is four-fold symmetric about Y (CylinderGeometry, 4 radial
+   * segments, thetaStart PI/4), so a quarter turn leaves its silhouette
+   * bit-identical and rotates only which tone faces where. That symmetry is why
+   * this is free rather than a visible spin — and it is why the alternative fix,
+   * flattening the two side tones to one ink, was not needed: the pawn keeps its
+   * three-tone read.
+   */
+  _orientToWorld() {
+    if (this.mesh) this.mesh.rotation.y = this.turns * Math.PI / 2;
   },
 
   /** Read-only state for the UI. Must contain nothing time-derived. */
