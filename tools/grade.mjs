@@ -7,8 +7,8 @@
  *   node tools/grade.mjs tally   --dir=/tmp/grade --verdicts=/tmp/verdicts.json
  *
  * PREPARE builds one side-by-side composite per (candidate, shot), with the
- * candidate randomly placed left or right by a seeded stream. Judges see
- * `manifest.json` and the images; they never see `key.json`.
+ * candidate's side assigned balanced-by-construction from a seeded stream.
+ * Judges see `manifest.json` and the images; they never see `key.json`.
  *
  * TALLY unblinds, and reports win rate per candidate WITH a confidence interval,
  * a position-bias check, and inter-judge agreement.
@@ -19,15 +19,19 @@
  * not detecting anything at all. Both conditions invalidate the headline and
  * both are cheap to detect.
  *
- * Judging itself is deliberately NOT done here. This tool handles blinding,
- * randomisation, unblinding and statistics; who or what looks at the images is
- * the caller's business. That separation is what makes the procedure auditable —
- * anyone with the seed can re-derive the blinding and check the arithmetic.
+ * Judging itself is deliberately NOT done here. This tool handles the images —
+ * compositing and file layout. Blinding, unblinding and statistics come from
+ * the `blind-panel` package, which was extracted FROM this repo and then fixed
+ * two defects the local copy still had: independent coin-flip side assignment
+ * (which produced a candidateLeft: 6 / candidateRight: 0 run on first use) and
+ * a normal-approximation interval that collapses to ±0 at 0/n and n/n wins.
+ * Depending on the package instead of keeping a parallel copy is what stops
+ * the buggy version looking authoritative ever again.
  */
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, join, basename } from 'node:path';
-import { buildPairs, manifestFor, keyFor, tally } from './lib/blind.js';
+import { buildPairs, keyFor, tally, problemsWith, sideBalance } from 'blind-panel';
 
 const argv = process.argv.slice(2);
 const cmd = argv[0];
@@ -97,23 +101,34 @@ if (cmd === 'prepare') {
 
   mkdirSync(join(outDir, 'pairs'), { recursive: true });
   for (const p of pairs) {
-    const candPath = join(candidateDirs[names.indexOf(p.candidate)], `${p.shot}.png`);
-    const refPath = join(referenceDir, `${p.shot}.png`);
+    const candPath = join(candidateDirs[names.indexOf(p.candidate)], `${p.item}.png`);
+    const refPath = join(referenceDir, `${p.item}.png`);
     const [leftPath, rightPath] = p.candidateSide === 'left' ? [candPath, refPath] : [refPath, candPath];
     writeFileSync(join(outDir, 'pairs', `${p.pairId}.png`), PNG.sync.write(composite(leftPath, rightPath)));
   }
 
-  writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifestFor(pairs), null, 2));
+  // The image manifest is presentation, not statistics: the package's manifest
+  // carries pairIds only, and where the composite lives is this tool's business.
+  const manifest = {
+    pairs: pairs.map((p) => ({ pairId: p.pairId, image: `pairs/${p.pairId}.png` })),
+    instructions:
+      'For each image, two renders are shown side by side. Decide which side is better ' +
+      'against the stated criterion and answer "left" or "right". You are not told which ' +
+      'is which, and the assignment differs per image. Answer every pair.',
+  };
+  writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
   writeFileSync(join(outDir, 'key.json'), JSON.stringify(keyFor(pairs, seed), null, 2));
 
-  const leftCount = pairs.filter((p) => p.candidateSide === 'left').length;
   console.log(JSON.stringify({
     out: outDir,
     candidates: names,
     shots: common,
     droppedShots: dropped,
     pairs: pairs.length,
-    sideBalance: { candidateLeft: leftCount, candidateRight: pairs.length - leftCount },
+    // Per-candidate left/right counts with worstSkew — reported so a degenerate
+    // assignment is visible BEFORE judging starts. This is the number that
+    // caught the original coin-flip bug.
+    sideBalance: sideBalance(pairs),
     seed,
     note: 'Judges get manifest.json and pairs/. Withhold key.json until verdicts are in.',
   }, null, 2));
@@ -135,10 +150,7 @@ if (cmd === 'tally') {
   const result = tally(key, verdicts);
   console.log(JSON.stringify(result, null, 2));
 
-  const problems = [];
-  if (result.unknownPairIds.length) problems.push(`${result.unknownPairIds.length} verdict(s) referenced an unknown pairId or an invalid choice`);
-  if (result.positionBias.suspect) problems.push(`POSITION BIAS: judges chose left ${(result.positionBias.leftRate * 100).toFixed(1)}% of the time — they may be responding to position rather than content, which invalidates the win rates above`);
-  if (result.agreement.nearChance) problems.push(`AGREEMENT NEAR CHANCE (${result.agreement.meanPairwiseAgreement}): the panel is not detecting a shared signal, so these win rates are noise however decisive they look`);
+  const problems = problemsWith(result);
 
   if (problems.length) {
     console.error('\nPROBLEMS:\n  - ' + problems.join('\n  - '));

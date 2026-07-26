@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPairs, manifestFor, keyFor, tally, agreementStats } from '../tools/lib/blind.js';
+import { buildPairs, manifestFor, keyFor, tally, agreementStats, sideBalance } from 'blind-panel';
 
 const SHOTS = ['hero', 'seam', 'wide', 'offaxis'];
 const CANDS = ['alpha', 'beta'];
@@ -29,6 +29,16 @@ test('every pair assigns the two sides to different images', () => {
   for (const p of buildPairs(CANDS, SHOTS, 's')) {
     assert.notEqual(p.candidateSide, p.referenceSide);
     assert.ok(['left', 'right'].includes(p.candidateSide));
+  }
+});
+
+test('side assignment is balanced by construction, not by luck', () => {
+  // The original tools/lib/blind.js copy flipped an independent coin per pair
+  // and produced candidateLeft: 6 / candidateRight: 0 on its first real run.
+  // The package builds the half-left/half-right list and shuffles it, so an
+  // even item count must split exactly — on every seed, not on average.
+  for (const seed of ['s', 'seed-1', 'audit', 'x']) {
+    assert.equal(sideBalance(buildPairs(CANDS, SHOTS, seed)).worstSkew, 0);
   }
 });
 
@@ -81,7 +91,8 @@ test('the confidence interval narrows as n grows', () => {
   const large = keyOf(['a'], SHOTS, 's');
   const rs = tally(small, verdictsWhere(small, ['j1'], ['a']));
   const rl = tally(large, verdictsWhere(large, ['j1', 'j2', 'j3'], ['a']));
-  assert.ok(rl.candidates[0].ci95 < rs.candidates[0].ci95);
+  // ci95 is a Wilson interval object; width is the comparable quantity.
+  assert.ok(rl.candidates[0].ci95.width < rs.candidates[0].ci95.width);
 });
 
 test('unknown pairIds and invalid choices are reported, not silently dropped', () => {

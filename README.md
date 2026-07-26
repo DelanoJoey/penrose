@@ -25,7 +25,7 @@ projection reads as one.
 | P3 | Art pass — run as a judge panel | ✅ |
 | P4 | Blind grading harness | ✅ |
 
-112 tests. The determinism gate runs on every PR.
+113 tests. The determinism gate runs on every PR.
 
 [METHODOLOGY.md](METHODOLOGY.md) is the honest record: what was measured, what
 was wrong, and what is still wrong. It is the most useful file here.
