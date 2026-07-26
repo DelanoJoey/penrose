@@ -24,6 +24,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import net from 'node:net';
 import { captureArgs, platformNote } from './_browser.mjs';
+import { shotUrl } from './lib/shot-url.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? true] : [a, true];
@@ -70,18 +71,21 @@ const report = {
 const probe = await browser.newPage({ viewport: { width: W, height: H } });
 await probe.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
 await probe.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
-const all = await probe.evaluate('Object.keys(window.__SHOTS__ ?? {})');
+const all = await probe.evaluate(
+  'Object.entries(window.__SHOTS__ ?? {}).map(([name, fn]) => ({ name, level: fn.level ?? null }))');
 await probe.close();
 
-const wanted = args.shots ? String(args.shots).split(',').map((s) => s.trim()) : all;
+const wanted = args.shots
+  ? String(args.shots).split(',').map((s) => s.trim()).map((n) => all.find((s) => s.name === n) ?? { name: n, level: null })
+  : all;
 
-for (const name of wanted) {
+for (const { name, level } of wanted) {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const logs = [];
   page.on('console', (m) => m.type() !== 'debug' && logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   try {
-    await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(name)}${EXTRA}`,
+    await page.goto(shotUrl({ port: PORT, shot: name, level, extra: EXTRA.replace(/^&/, '') }),
       { waitUntil: 'domcontentloaded', timeout: 90000 });
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
 
@@ -102,11 +106,11 @@ for (const name of wanted) {
 
     await page.screenshot({ path: `${OUTDIR}/${name}.png`, type: 'png' });
     const info = await page.evaluate('window.__RENDER_INFO__ ?? null');
-    report.shots.push({ shot: name, ok: !applied?.error, info, logs: logs.filter((l) => /pageerror|\[error\]/.test(l)) });
+    report.shots.push({ shot: name, level, ok: !applied?.error, info, logs: logs.filter((l) => /pageerror|\[error\]/.test(l)) });
     if (applied?.error) report.ok = false;
   } catch (e) {
     report.ok = false;
-    report.shots.push({ shot: name, ok: false, error: e.message });
+    report.shots.push({ shot: name, level, ok: false, error: e.message });
   } finally {
     await page.close();
   }
