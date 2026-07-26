@@ -1,0 +1,54 @@
+name: gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A PR that supersedes an in-flight run should cancel it.
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: build + determinism gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npx vite build
+
+      # The gate is a SELF-CONSISTENCY check: it captures the full shot set
+      # twice on this runner and requires the two runs to be pixel-identical.
+      # That is what makes it portable. Committed reference PNGs would not be —
+      # this runner has no GPU and rasterises via SwiftShader, so its pixels
+      # legitimately differ from any developer machine. Comparing a run against
+      # another run on the SAME machine is the comparison that means something.
+      #
+      # A failure here means the engine has nondeterminism, and every downstream
+      # claim about performance or refactoring is unfalsifiable until it is fixed.
+      - name: Determinism gate
+        run: node tools/gate.mjs --port=5199
+
+      - name: Upload diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-diffs
+          path: /tmp/penrose-gate-*/
+          if-no-files-found: ignore
+          retention-days: 7

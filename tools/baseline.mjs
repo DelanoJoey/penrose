@@ -23,6 +23,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import net from 'node:net';
+import { captureArgs, platformNote } from './_browser.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? true] : [a, true];
@@ -57,14 +58,13 @@ if (!(await portOpen(PORT))) {
   if (!up) { server.kill(); throw new Error('vite failed to start'); }
 }
 
-const browser = await chromium.launch({
-  headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb',
-         '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio', '--disable-frame-rate-limit'],
-});
+const browser = await chromium.launch({ headless: true, args: captureArgs() });
 
 mkdirSync(OUTDIR, { recursive: true });
-const report = { ok: true, outDir: OUTDIR, size: `${W}x${H}`, isolated: true, settle: SETTLE, shots: [], errors: [] };
+const report = {
+  ok: true, outDir: OUTDIR, size: `${W}x${H}`, isolated: true, settle: SETTLE,
+  platform: platformNote, shots: [], errors: [],
+};
 
 // Discover the shot list from a throwaway page.
 const probe = await browser.newPage({ viewport: { width: W, height: H } });
