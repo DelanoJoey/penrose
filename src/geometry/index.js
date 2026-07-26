@@ -55,6 +55,12 @@ export function depth(x, y, z) {
 export const cellId = (x, y, z) => `${x},${y},${z}`;
 export const parseCell = (id) => id.split(',').map(Number);
 
+/** Split a "x,y,z@t" search state. Uses lastIndexOf so negative coords are safe. */
+const splitState = (s) => {
+  const i = s.lastIndexOf('@');
+  return [s.slice(0, i), Number(s.slice(i + 1))];
+};
+
 /**
  * Screen-lattice deltas produced by each unit move in 3D.
  * Note a + b is always even, so the reachable lattice is a checkerboard.
@@ -203,6 +209,72 @@ export class Structure {
           return path.reverse();
         }
         queue.push(next);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Route from one cell to another ACROSS rotation states.
+   *
+   * findPath answers "is there a path in this one rotation". This answers the
+   * question the game actually asks, where turning is itself a move:
+   *
+   *   walk : (cell, t) -> (neighbour, t)   only between standable cells
+   *   turn : (cell, t) -> (cell, t +/- 1)  ALWAYS legal
+   *
+   * THE UNCONDITIONAL TURN IS NOT AN OVERSIGHT. The intuitive rule -- only turn
+   * when the cell is standable in both states, so you cannot strand yourself --
+   * contradicts the game. src/world.setRotation has no standability check, and
+   * src/player/index.js:366 says so explicitly: "If the current cell is not
+   * standable in this rotation it has no entry, and every direction is blocked
+   * -- which is correct: rotate back to get out." A legitimate route may pass
+   * THROUGH a rotation in which its cell is not a platform. An analyser using
+   * the stricter rule would disagree with the player about what the level is,
+   * and geometry is supposed to be the one authority both read.
+   *
+   * A turn and a walk cost the same: both are one keypress. So a "shortest"
+   * route may prefer turning to walking. Deliberate, and recorded rather than
+   * weighted, because no evidence yet says what a better weighting would be.
+   *
+   * @returns {Array<{kind:'walk'|'turn'}>|null} ordered moves, [] if already
+   *   at the goal, null if unreachable in every rotation.
+   */
+  findRoute(fromCell, toCell, startTurns = 0) {
+    const graphs = [0, 1, 2, 3].map((t) => this.pathGraph(t));
+    const goal = cellId(...toCell);
+    const t0 = ((startTurns % 4) + 4) % 4;
+    const start = `${cellId(...fromCell)}@${t0}`;
+
+    const prev = new Map([[start, null]]);
+    const queue = [start];
+
+    while (queue.length) {
+      const cur = queue.shift();
+      const [id, turns] = splitState(cur);
+
+      if (id === goal) {
+        const chain = [];
+        for (let n = cur; n != null; n = prev.get(n)) chain.push(n);
+        chain.reverse();
+        const moves = [];
+        for (let i = 1; i < chain.length; i++) {
+          const [pc, pt] = splitState(chain[i - 1]);
+          const [qc, qt] = splitState(chain[i]);
+          moves.push(pc === qc
+            ? { kind: 'turn', from: pt, to: qt }
+            : { kind: 'walk', from: pc, to: qc, turns: pt });
+        }
+        return moves;
+      }
+
+      for (const next of graphs[turns].get(id) ?? []) {
+        const k = `${next}@${turns}`;
+        if (!prev.has(k)) { prev.set(k, cur); queue.push(k); }
+      }
+      for (const d of [1, 3]) {
+        const k = `${id}@${(turns + d) % 4}`;
+        if (!prev.has(k)) { prev.set(k, cur); queue.push(k); }
       }
     }
     return null;
