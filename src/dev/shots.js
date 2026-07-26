@@ -174,5 +174,23 @@ export function makeShots(ctx) {
       render()?.frameCells([[5, 5, 1], [5, 5, 2], [5, 5, 3], [5, 6, 2]],
         { fillY: 0.64, fillX: 0.72, liftY: 0.01, shiftX: -0.06 });
     },
+
+    /**
+     * The three rotation-required levels, one plate each.
+     *
+     * Each declares the level it needs, because src/world fixes the level at
+     * init from boot config — a shot function cannot switch it. Framed at turn
+     * 0, the state the level opens in.
+     *
+     * These exist because a level with no pixel coverage can regress in the
+     * renderer and nothing in this repository would notice: tools/analyze.mjs
+     * proves a level's ROUTING premise, never its picture.
+     */
+    spur01: Object.assign(plate(0, { fillY: 0.74, fillX: 0.84, liftY: 0.025 }),
+      { level: 'spur-01' }),
+    span02: Object.assign(plate(0, { fillY: 0.74, fillX: 0.84, liftY: 0.025 }),
+      { level: 'span-02' }),
+    shelf03: Object.assign(plate(0, { fillY: 0.74, fillX: 0.84, liftY: 0.025 }),
+      { level: 'shelf-03' }),
   };
 }
