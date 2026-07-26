@@ -11,21 +11,59 @@ npx playwright install chromium
 npm run dev            # http://127.0.0.1:5173
 ```
 
-## Status
+Move with the arrow keys or WASD, rotate with Q/E. The four movement directions
+are the four screen diagonals, because every horizontal step in an isometric
+projection reads as one.
 
-**P0 complete.** Engine skeleton, determinism contract, and capture/diff/profile
-harness are in place, and the gate is proven to pass on identical input and fail
-on a single least-significant-bit palette change. No game content exists yet —
-that is the point. See [METHODOLOGY.md](METHODOLOGY.md) for the evidence.
+## Status
 
 | Phase | | |
 |---|---|---|
-| P0 | Contracts & harness | ✅ complete |
-| P1 | Core geometry — isometric projection, impossible-geometry path graph | next |
-| P2 | Independent surfaces — audio, UI, level content, FX | |
-| P3 | Art pass | |
-| P4 | Adversarial grading loop | |
-| P5 | Performance + publish | |
+| P0 | Contracts, determinism, and a proven pixel gate | ✅ |
+| P1 | Isometric projection and the impossible-geometry path graph | ✅ |
+| P2 | Avatar, HUD, procedural audio, camera-orbit rotation | ✅ |
+| P3 | Art pass — run as a judge panel | ✅ |
+| P4 | Blind grading harness | ✅ |
+
+112 tests. The determinism gate runs on every PR.
+
+[METHODOLOGY.md](METHODOLOGY.md) is the honest record: what was measured, what
+was wrong, and what is still wrong. It is the most useful file here.
+
+## What is worth stealing
+
+Four things, in rough order of how transferable they are:
+
+1. **Declare determinism before you need it.** The gate below is worthless
+   unless the same frame index produces the same pixels. Stating that as a
+   precondition costs nothing; retrofitting it costs a remediation pass across
+   every subsystem. See `ARCHITECTURE.md` §1.
+2. **A gate that has never failed is not a gate.** Every guard in this
+   repository was verified by breaking the thing it guards and confirming it
+   fails. A pixel gate that has only ever passed proves nothing.
+3. **Measure under the conditions the target actually has.** Two numbers in this
+   project looked fine and meant nothing — an fps figure that measures rAF
+   dispatch overhead, and a structural budget that stayed constant through a 20×
+   wall-clock regression because CI has no GPU and the dev machine does.
+4. **Report position bias and inter-judge agreement, not just the win rate.**
+   See `tools/grade.mjs`.
+
+## Origin
+
+A deliberate variation on
+[mshumer/Claude-of-Duty](https://github.com/mshumer/Claude-of-Duty), which built
+a Three.js FPS from one prompt and published an unusually honest scorecard:
+5.05/10 against modern Call of Duty, with every critic in every blind round
+picking the real frame. Its own post-mortem named the wall — *"surfaces read as
+procedural noise rather than photographed reality — the ceiling of generating
+texture from code."*
+
+So this picks a target where that ceiling does not exist. **Target selection is
+the engineering decision**, and the art panel in P3 proved the point from the
+other direction: the most beautiful of the three candidate directions *lost*,
+because its atmospheric depth cue made the impossible edge legible. A Penrose
+figure only works if the eye cannot tell which leg is far, so any depth cueing is
+disqualified however well executed.
 
 ## The gate
 
