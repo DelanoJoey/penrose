@@ -449,10 +449,43 @@ does not share.** The structural budget (draw calls, programs, heap) was held
 exactly and still failed to predict a 20× wall-clock regression, because it
 counts objects rather than the cost of rasterising them.
 
-The job timeout was raised to 30 minutes as *headroom, not a fix*. The real fix
-is to bake the paper once into a render target and draw a single textured quad —
-128,000 triangles down to 2, art preserved exactly — which trades `textures 0 → 1`
-and is therefore an art-owner decision rather than a unilateral one.
+The job timeout was raised to 30 minutes as *headroom, not a fix*.
+
+### The fix, and what chasing bit-exactness actually cost
+
+The paper is now rasterised **once** into a render target, and the scene draws a
+two-triangle quad sampling it. Same mesh, same hash, same art.
+
+Measured under `--use-gl=swiftshader` to reproduce CI's conditions:
+
+| | before | after |
+|---|---|---|
+| `pump(90)` + screenshot, hero @1600×1000 | 4394 ms | **1023 ms** |
+| triangles per frame | 128,400 | **402** |
+| draw calls | 3 | 3 |
+| programs compiled during play | 0 | **0** |
+| heap growth | 0 MB | 0 MB |
+
+Costs, stated rather than buried: **programs 1 → 3** (all at boot — two was the
+prediction, three is the measurement, and the obvious fix of matching the
+structure's material key does *not* reduce it), and **textures 0 → 1**.
+
+**It is not pixel-identical: maxDelta 1 over 2.8% of the widest shot.** Getting
+there from maxDelta 2 / 30.9% meant finding three separate causes, none of which
+was the one guessed first:
+
+1. A material declaring `vertexColors` on geometry with no colour attribute —
+   renders black. Caught immediately by looking at the image rather than the
+   number.
+2. A target sized to the viewport when the paper quad is scaled to `bleed: 1.03`
+   times the frustum, so the texture was magnified by 3% instead of sampled 1:1.
+3. An 8-bit colour-space round trip.
+
+The residual is last-bit difference along the paper's internal triangle edges.
+Handled the way §5 requires — a **deliberate reference re-capture**, not a
+relaxed tolerance. The gate is a self-consistency check, so it stayed green
+throughout and never had an opinion about this; the honesty here is doing the
+re-capture as a reviewed act instead of quietly widening `--tol`.
 
 ---
 
