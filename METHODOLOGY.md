@@ -929,6 +929,197 @@ it exercises precisely the path the pixel gate does not cover.
 
 ---
 
+## P8 — the second figure family
+
+**Completed 2026-07-26.** The campaign is seven levels across two figure
+families, and stops being one shape at four sizes.
+
+### The tribar family is one-dimensional, and that is provable
+
+P7 left "three of four levels are tribars" as a content gap. It is not a content
+gap. Enumerating **every** three-leg closed circuit with legs 1..8 gives 48 hits,
+and the distinct leg-length multisets are exactly `1,1,1` through `8,8,8` —
+**every three-leg closed circuit has all three legs equal.**
+
+Closure requires net displacement `(t,t,t)`, the only displacement the view
+direction collapses to nothing. With three legs on three distinct axes and
+positive lengths, that forces all three equal. The family has one degree of
+freedom: size. No amount of level authoring escapes it; only a different leg
+count does.
+
+### The endless staircase is not constructible here
+
+The obvious second Escher figure, and `src/geometry`'s own docstring already
+notes the mechanism — `+x` then `+y` has the same screen delta as `-z`, which
+*is* the Penrose staircase.
+
+It still cannot close. Closing forces net `(t,t,t)`, so `net_y = t` is the total
+climb while `net_x + net_z = 2t`; a staircase climbing once per horizontal step
+spends only `t` horizontal steps and needs `2t`. The shallowest closable stair is
+therefore **two horizontal steps per unit of climb**, which reads as a ramp.
+
+Measured against the algebra: of 3,562 four-flight closed circuits carrying an
+illusion edge, **280** have three of four flights climbing and **0** have all
+four. A search confirming a proof, not a search that came up empty.
+
+### The order of the loop was wrong, not the destination
+
+P7's advice was *"the work is the render-and-judge loop over that pool, not more
+searching."* Right about the destination, wrong about the order. Visual judgement
+is the expensive, human, non-reproducible stage, so everything computable belongs
+in front of it:
+
+| stage | survivors |
+|---|---|
+| four legs, net a positive multiple of `(1,1,1)`, legs 1..6 | 810 |
+| no repeated 3D cell | 810 |
+| carries at least one illusion edge | 440 |
+| ≥8 distinct screen cells | 400 |
+| **encloses a hole on screen** | 330 |
+| non-degenerate: doubles back, min leg 2, ≥9 screen cells, ≤20 cells | 102 |
+| hosts a strong-premise route once augmented | 102 |
+
+`tools/search.mjs` prints all seven numbers. It is **committed**, unlike its
+predecessor: P7's scaffolding was thrown away, so its finding — 18 four-leg
+circuits at net `(2,2,2)` — cannot now be reproduced or diffed against. This
+phase measured 70 at that net under broader constraints and cannot reconcile the
+two, because there is nothing left to compare with. That is not a claim the
+earlier number was wrong. It is a claim that nobody can now tell.
+
+### The hole criterion, and why it is not a judge
+
+An impossible figure needs somewhere for the eye to trace the loop. A closed
+circuit that folds back on itself projects as a filled slab and reads as an
+ordinary solid however good its routing premise is — which is exactly what P7
+got when it rendered a four-leg circuit and saw a rectangular bar.
+
+`Structure.enclosedHoles` floods the empty complement inward from the bounding
+box and returns what it cannot reach. Six neighbours, not four: `a+b` is always
+even, so the screen lattice is a hex grid.
+
+**It is necessary and NOT sufficient**, and the counterexample is pinned as a
+test fixture: a figure with three enclosed cells that still renders as an
+ordinary staircase. Closure was already known to be necessary-not-sufficient;
+this is a second such condition, not a decision procedure. The filter cuts
+400 → 330. The eye still decides.
+
+### Three details this phase asserted were load-bearing are not covered
+
+The guard for the hole detector was supposed to be swapping the six-neighbour set
+for the four horizontal steps. **It did not fail** — 6 pass, 0 fail. The
+reasoning behind it was wrong twice over: the four horizontal steps *generate*
+the vertical ones, since `(+1,+1) + (-1,+1) = (0,+2)`, so both sets reach the same
+lattice; and a smaller neighbourhood makes a fill *more* restricted, so the error
+would be over-reporting enclosure, never under-reporting it.
+
+Two further details the code's comments implied were load-bearing also turned out
+uncovered:
+
+| mutation | result |
+|---|---|
+| `SCREEN_NEIGHBOURS` → 4-connected | 6 pass, 0 fail — **not covered** |
+| bounding-box padding `2` → `0` | 6 pass, 0 fail — **not covered** |
+| border seed two b-rows → one | 6 pass, 0 fail — **not covered** |
+| flood fill drops the `occupied` wall check | **3 pass, 3 fail** ✅ |
+
+Padding is uncovered because no fixture has a hole touching its bounding box; the
+two-row seed because the column loop already seeds both parities. The mutation
+that does fail collapses every positive to `0` while **both negative controls stay
+green** — the signature that distinguishes a broken detector from a fixture set
+that never discriminated.
+
+The comments now say which parts are correct by construction rather than by
+coverage. A comment asserting that a constraint matters, on code where nothing
+checks it, is the same species of defect as a green gate measuring the wrong
+thing.
+
+### Flat projections are not a substitute for the renderer
+
+Candidates were first judged as true isometric SVG — same `(a,b)` invariant, same
+depth rule. On that evidence 9 of 12 figures were rejected as ordinary frames and
+slabs.
+
+Rendered through `baseline.mjs`, **all six shortlisted candidates read as
+impossible.** The riso palette and lighting do work a wireframe throws away, and
+the SVG pass was badly pessimistic. Fifth time in this repository that looking at
+the real render overturned a conclusion — and the first time it overturned one in
+the *optimistic* direction. Every figure that ships was chosen from an engine
+render.
+
+### Identical statistics are not an identical figure
+
+The spec claimed one figure was "a cyclic rotation of" another, "the same figure
+entered from a different leg". Measured: neither the 3D cell set nor the screen
+outline matches. These circuits close **on screen** but not in 3D — the net is a
+positive multiple of `(1,1,1)`, never zero — so reordering the legs traces a
+different shape.
+
+They were conflated because their statistics are identical: 17 cells, 9 holes, 2
+illusion edges, 12 standable. That is the same trap as the illusion-edge count,
+which is 2 for every four-leg candidate *and* for the tribar, and therefore
+discriminates nothing.
+
+### A false green, caught by a count
+
+The first before/after capture reported 15 shots and an all-zero diff. It ran in
+the reference worktree — no `cd` back — and compared the pre-change tree against
+itself. **The tell was the shot count: 15 where 18 was expected.**
+
+Same species as P5's stale dev server, different mechanism, same lesson: an
+all-zero diff is evidence only if you can say what produced it. Re-verified
+against a reference captured at the commit *before* the levels landed, so the
+comparison covers the levels and the shots together rather than the shots alone.
+
+### The first cost estimate in this repository that did not miss
+
+Measured under `PENROSE_GL=swiftshader`, twice each:
+
+| | run 1 | run 2 |
+|---|---|---|
+| 15 shots | 21.61 s | 21.56 s |
+| 18 shots | 26.09 s | 26.01 s |
+
+Marginal **1.49 s/shot**, projected gate delta **≈8.9 s** against the plan's 8.5 s
+hypothesis. P5's static rate was ~1.4 s/shot and P6 measured 21.255 s for 15
+shots, so both reproduce. Note P6 found CI running ~1.8× above the local
+SwiftShader figure, so the CI delta may land nearer 16 s; nothing here is close to
+the 30-minute timeout.
+
+### Verification
+
+| check | result |
+|---|---|
+| `npm test` | 181 pass, 0 fail |
+| `analyze` × 8 levels | all exit 0 |
+| `npm run gate` | `identical: true`, 18 shots, "[gate] PASS" |
+| 15 references, before the levels and after the shots | `rows 15, missing 0, strict, tol 0, identical true`, no nonzero row |
+| hole-detector guard | verified to fail — 3 pass / 3 fail, both negative controls green |
+| declared vs measured premises | exact on all 7 campaign levels, `minTurns` and `minWalks` |
+| plate framing | measured subject bbox, `fillY` 0.748/0.749/0.748 against the existing 0.749 |
+| **played end to end** | 7 levels, `campaign/complete {"levels":7}`, zero page errors |
+
+The playthrough drives `player.step()` and `world/rotate-request` directly,
+because `src/ui/index.js:412` does not attach the keydown listener under lockstep
+at all. So `resolveKey` is *not* covered by it — `test/ui.test.js` covers that —
+and everything downstream is.
+
+### Still open
+
+- **Whether a 6-turn level is any good is still unmeasured.** `crook-06` is 5
+  walks against 6 turns: **55% of the player's inputs are rotations**, where
+  `arm-04` is 25% and `perch-05` 33%. The playthrough proves it is completable,
+  not that it is enjoyable, and a machine driving the route cannot tell the
+  difference. `findRoute` still costs a turn and a walk equally — the open
+  decision from P5 — and this is the level that would justify revisiting it.
+- The 102-figure pool was judged nine figures deep. There are 1,255 distinct
+  augmented shapes at exactly 4 turns and 104 at 5; the vast majority have never
+  been looked at.
+- No persistence, and no ending beyond a HUD line. Unchanged from P7.
+- The `-1` orbit is still uncaptured, and `src/core/engine._emit` still has no
+  try/catch. Both unchanged.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted

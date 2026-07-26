@@ -647,7 +647,7 @@ git commit -m "shots: gate the three new levels"
 **Files:**
 - Modify: `METHODOLOGY.md`
 
-- [ ] **Step 1: Measure the CI cost under the rasteriser CI actually uses**
+- [x] **Step 1: Measure the CI cost under the rasteriser CI actually uses**
 
 A timing from this machine is not evidence about CI.
 
@@ -658,7 +658,7 @@ PENROSE_GL=swiftshader node tools/baseline.mjs --out=/tmp/sff-18 --port=5601
 
 Record both wall-clock figures and the marginal per-shot rate. Three cost estimates in this repository have missed, in both directions — report the measurement, not the prediction.
 
-- [ ] **Step 2: Play it end to end**
+- [x] **Step 2: Play it end to end**
 
 ```bash
 npm run dev
@@ -668,7 +668,7 @@ Play all seven campaign levels to `campaign/complete`. `src/campaign` is inert u
 
 **Record honestly whether the 6-turn levels are tedious.** Spec risk 1 says roughly half the player's inputs are rotations and that this is a playtest question. If it is not fun, say so in the record and raise it rather than shipping it silently.
 
-- [ ] **Step 3: Full verification sweep**
+- [x] **Step 3: Full verification sweep**
 
 | check | command | bar |
 |---|---|---|
@@ -679,7 +679,7 @@ Play all seven campaign levels to `campaign/complete`. `src/campaign` is inert u
 | hole guard | Task 2 | verified to fail, output recorded |
 | playthrough | manual | 7 levels, `campaign/complete`, zero page errors |
 
-- [ ] **Step 4: Write METHODOLOGY §P8**
+- [x] **Step 4: Write METHODOLOGY §P8**
 
 Follow the existing section shape: what was found, what was decided and why, **what the spec got wrong**, the verification table, and what is still open. Include:
 
@@ -690,7 +690,7 @@ Follow the existing section shape: what was found, what was decided and why, **w
 - the measured CI cost against the P6 baseline
 - an honest verdict on whether 6-turn levels are fun
 
-- [ ] **Step 5: Commit and open the PR**
+- [x] **Step 5: Commit and open the PR**
 
 ```bash
 git add METHODOLOGY.md
@@ -699,7 +699,7 @@ git push -u origin feat/second-figure-family
 gh pr create --title "The second figure family" --body "..."
 ```
 
-- [ ] **Step 6: Verify CI conclusion authoritatively**
+- [x] **Step 6: Verify CI conclusion authoritatively**
 
 `gh run watch --exit-status` is unreliable.
 
@@ -714,12 +714,12 @@ Expected: `"conclusion": "success"`.
 
 ## Definition of done
 
-- [ ] 181 tests pass, full suite, no path scope
-- [ ] All 8 levels exit 0 from `analyze.mjs`
-- [ ] Gate `identical: true` across 18 shots
-- [ ] The 15 pre-existing references at `maxDelta: 0`
-- [ ] Hole-detector guard verified to fail, literal output recorded
-- [ ] Every new figure judged by opening its render, not by its metrics
-- [ ] Played end to end, with an honest verdict on the 6-turn levels
-- [ ] CI green, confirmed via `gh run view --json conclusion`
-- [ ] METHODOLOGY §P8 written, including what this plan got wrong
+- [x] 181 tests pass, full suite, no path scope
+- [x] All 8 levels exit 0 from `analyze.mjs`
+- [x] Gate `identical: true` across 18 shots
+- [x] The 15 pre-existing references at `maxDelta: 0`
+- [x] Hole-detector guard verified to fail, literal output recorded
+- [x] Every new figure judged by opening its render, not by its metrics
+- [x] Played end to end, with an honest verdict on the 6-turn levels
+- [x] CI green, confirmed via `gh run view --json conclusion`
+- [x] METHODOLOGY §P8 written, including what this plan got wrong
