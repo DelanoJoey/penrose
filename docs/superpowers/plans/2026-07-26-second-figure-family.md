@@ -265,44 +265,60 @@ git commit -m "geometry: detect the holes a figure encloses on screen"
 
 ---
 
-## Task 2: Prove the hole detector can fail
+## Task 2: Prove the hole detector can fail — DONE, and it did not go as planned
 
-A gate that has never been seen to fail is not evidence. This repository verifies every guard.
+A gate that has never been seen to fail is not evidence. This repository verifies
+every guard. This one falsified the plan instead, which is the more useful result.
 
-**Files:** none committed — this task makes a temporary edit and reverts it.
+**Files:** `src/geometry/index.js` — two comments corrected. The plan said "no
+commit"; that assumed nothing would change, and two committed claims turned out
+to be false.
 
-- [ ] **Step 1: Break the neighbourhood from six to four**
+- [x] **Step 1–2: The planned mutation DID NOT FAIL**
 
-In `src/geometry/index.js`, temporarily change:
+Substituting `HORIZONTAL_STEPS` for the six-neighbour set left the suite at
+**6 pass, 0 fail**. The plan predicted collapse. Both halves of its reasoning
+were wrong:
 
-```js
-export const SCREEN_NEIGHBOURS = Object.values(SCREEN_DELTA);
+- the four horizontal steps **generate** the vertical ones — `(+1,+1) + (-1,+1) = (0,+2)` — so both sets reach the same lattice;
+- and a *smaller* neighbourhood makes a fill **more** restricted, so the error would be over-reporting enclosure, never "reports that nothing is enclosed".
+
+- [x] **Step 2b: Two further "load-bearing" details were also redundant**
+
+| mutation | result |
+|---|---|
+| `SCREEN_NEIGHBOURS` → 4-connected | **6 pass, 0 fail** — not covered |
+| bounding-box padding `2` → `0` | **6 pass, 0 fail** — not covered |
+| border seed two b-rows → one | **6 pass, 0 fail** — not covered |
+| flood fill drops the `occupied` wall check | **3 pass, 3 fail** ✅ |
+
+Padding is uncovered because no fixture has a hole touching its bounding box.
+The two-row seed is uncovered because the `minA`/`maxA` column loop already seeds
+both parities.
+
+- [x] **Step 3: The mutation that does fail, with literal output**
+
+```
+✖ a tribar encloses a hole, and it grows with the figure     0 !== 1
+✖ the shipping levels that read as impossible enclose a hole 0 !== 1
+✖ NECESSARY, NOT SUFFICIENT — ordinary stairs                0 !== 3
+ℹ tests 6 / pass 3 / fail 3
 ```
 
-to:
+Right signature: every positive collapses to `0` while **both negative controls
+stay green**, which is what distinguishes a detector that broke from a test set
+that never discriminated.
 
-```js
-export const SCREEN_NEIGHBOURS = HORIZONTAL_STEPS;   // TEMPORARY — 4 of 6
-```
+- [x] **Step 4: Revert, correct the false comments, verify**
 
-- [ ] **Step 2: Run the hole tests and record the literal failure**
+Reverted, then corrected the `SCREEN_NEIGHBOURS` docstring and the border-seed
+comment to state what was measured — including that six-vs-four is correctness by
+construction rather than by coverage. `npm test` → **172 pass, 0 fail**.
 
-```bash
-node --test src/geometry/holes.test.js
-```
-
-Expected: FAIL. The 4-connected fill leaks through the `±y` gaps, so enclosed counts collapse. **Record the actual numbers reported** — they go in the METHODOLOGY entry in Task 7. Do not paraphrase them.
-
-- [ ] **Step 3: Revert and confirm green**
-
-```bash
-git checkout src/geometry/index.js
-node --test src/geometry/holes.test.js   # expected: 7 pass
-```
-
-- [ ] **Step 4: No commit** — nothing changed. The evidence is the recorded output.
-
----
+**Carry to METHODOLOGY §P8:** three details this plan asserted were load-bearing
+are not covered by the fixtures. The comments now say so. A comment claiming a
+constraint matters, on code where nothing tests it, is the same species of defect
+as a green gate that measures the wrong thing.
 
 ## Task 3: `tools/search.mjs`
 
