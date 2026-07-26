@@ -159,3 +159,13 @@ test('it survives world being absent', async () => {
   assert.equal(campaign.state().total, 0);
   assert.equal(h.of('campaign/complete').length, 1, 'an empty order completes rather than throwing');
 });
+
+test('the index is seeded from world at init, not only from the event', async () => {
+  // Registration order must not be load-bearing. When this subsystem was added
+  // AFTER world, world had already emitted level/loaded inside its own init, the
+  // event was never heard, and the HUD showed "1 / 4" while playing level 2.
+  const h = harness();
+  h.ctx.peek = (n) => (n === 'world' ? { order: ORDER, level: { name: ORDER[2] } } : null);
+  await campaign.init(h.ctx);
+  assert.equal(campaign.state().index, 2, 'campaign ignored a level world had already loaded');
+});

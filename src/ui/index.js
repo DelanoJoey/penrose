@@ -212,6 +212,13 @@ function stylesheet(PALETTE) {
   border-radius: 3px;
 }
 
+#hud .progress {
+  margin: -8px 0 12px;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  opacity: 0.55;
+}
+
 #hud .level {
   margin: 0 0 12px;
   font-size: 15px;
@@ -348,7 +355,10 @@ export default {
     const panel = el('div', 'panel');
 
     this.elLevel = el('div', 'level', '—');
-    panel.append(this.elLevel, el('div', 'rule'));
+    // Its OWN element, not a child of elLevel: update() writes elLevel.textContent,
+    // which replaces all children and would silently delete a nested span.
+    this.elProgress = el('div', 'progress', '');
+    panel.append(this.elLevel, this.elProgress, el('div', 'rule'));
 
     const movesRow = el('div', 'row');
     this.elMoves = el('span', null, '0');
@@ -389,7 +399,7 @@ export default {
      * produce, so the first update() writes every field exactly once and every
      * update after that writes only what actually moved.
      */
-    this.shown = { level: null, moves: -1, turns: -1, solved: null };
+    this.shown = { level: null, moves: -1, turns: -1, solved: null, progress: null, complete: null };
 
     if (this.inputEnabled) {
       this._onKeyDown = (event) => this._handleKey(event);
@@ -477,9 +487,24 @@ export default {
       shown.turns = turns;
     }
 
-    if (solved !== shown.solved) {
-      this.elSolved.hidden = !solved;
+    // Campaign position. Read through peek like everything else here, and absent
+    // entirely when the campaign is inert (capture) or the level is off-campaign.
+    const run = ctx.peek('campaign')?.state?.();
+    const progress = run && run.enabled && run.total > 0
+      ? `${Math.min(run.index + 1, run.total)} / ${run.total}`
+      : '';
+    const complete = run?.complete === true;
+
+    if (progress !== shown.progress) {
+      this.elProgress.textContent = progress;
+      shown.progress = progress;
+    }
+
+    if (solved !== shown.solved || complete !== shown.complete) {
+      this.elSolved.textContent = complete ? 'All levels complete' : 'Solved';
+      this.elSolved.hidden = !(solved || complete);
       shown.solved = solved;
+      shown.complete = complete;
     }
   },
 
