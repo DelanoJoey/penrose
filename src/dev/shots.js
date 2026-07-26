@@ -74,7 +74,7 @@
  * reference set valid across this change.
  */
 
-import { rotateY } from '../geometry/index.js';
+import { rotateY, SCREEN_DELTA } from '../geometry/index.js';
 
 export function makeShots(ctx) {
   const world = () => ctx.peek('world');
@@ -212,5 +212,74 @@ export function makeShots(ctx) {
       { level: 'span-02' }),
     shelf03: Object.assign(plate(0, { fillY: 0.74, fillX: 0.84, liftY: 0.025 }),
       { level: 'shelf-03' }),
+
+    /**
+     * ===================== MOTION SHOTS =====================
+     *
+     * The only three shots in the set captured MID-FLIGHT. Each declares the
+     * `settle` it needs (see the MOTION SHOTS note at the top of this file), and
+     * tools/baseline.mjs refuses any of them that lands on a settled frame.
+     *
+     * Frame counts are MEASURED, not computed. The orbit commits at frame 28 in
+     * the real engine, where ceil(ORBIT_SECONDS / fixedDt) says 27 —
+     * src/render/camera.test.js derives 27 from the same constants in isolation
+     * and the extra frame appears only when the whole engine is driven.
+     * test/motion-frames.test.js pins both counts so a timing change fails
+     * loudly instead of silently shifting which frame gets captured.
+     *
+     * The two orbit shots frame the WHOLE structure rather than tight on the
+     * avatar. The camera swings 90 degrees about the world origin during an
+     * orbit, so a tight frustum would carry the subject out of frame; and the
+     * avatar's bias defect this shot exists to catch was originally measured at
+     * exactly this scale (3.32% of pixels, maxDelta 228 — see METHODOLOGY P2).
+     */
+
+    /**
+     * Mid-swing, frame 14 of 28.
+     *
+     * The avatar is placed at loop-01's START CELL deliberately: its (1,1,1)
+     * view bias is 5 there and 0 at every other standable cell in the project,
+     * and src/player drops that bias for the duration of an orbit because the
+     * bias is only a screen no-op while the camera is ON the isometric axis.
+     * This is the only shot in the set where that code path is visible at all.
+     */
+    orbitmid: Object.assign(() => {
+      compose(0, () => [...rotated(0), ...rotated(1)],
+        { fillY: 0.62, fillX: 0.74, liftY: 0.02 });
+      ctx.peek('player')?.placeAt('1,0,0');
+      ctx.emit('world/rotate-request', { delta: 1 });
+    }, { settle: 14 }),
+
+    /**
+     * The last frame still in flight, 27 of 28.
+     *
+     * NOT the commit frame. The orbit goes inactive AT 28, so a shot settling
+     * there reports `orbiting: false` and the harness rejects it — correctly,
+     * because at that point nothing is moving. The committed state is already
+     * covered statically by `rot1`, and the DELTA across the commit is what
+     * tools/commitframe.mjs exists to measure.
+     */
+    orbitlate: Object.assign(() => {
+      compose(0, () => [...rotated(0), ...rotated(1)],
+        { fillY: 0.62, fillX: 0.74, liftY: 0.02 });
+      ctx.peek('player')?.placeAt('1,0,0');
+      ctx.emit('world/rotate-request', { delta: 1 });
+    }, { settle: 27 }),
+
+    /**
+     * A step in flight, frame 7 of 14 — the top of the hop arc.
+     *
+     * Framed on the upper walkway like `avatarmid`, but the pawn is moving
+     * rather than parked, so this covers the interpolation and the HOP that no
+     * static shot can see.
+     */
+    stepmid: Object.assign(() => {
+      world()?.setRotation(0);
+      const p = ctx.peek('player');
+      p?.placeAt('5,5,1');
+      render()?.frameCells([[5, 5, 1], [5, 5, 2], [5, 5, 3], [5, 6, 2]],
+        { fillY: 0.64, fillX: 0.72, liftY: 0.01, shiftX: -0.06 });
+      p?.step(SCREEN_DELTA['+z']);
+    }, { settle: 7 }),
   };
 }
