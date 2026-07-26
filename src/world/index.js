@@ -40,6 +40,48 @@ export default {
   async init(ctx) {
     this._ctx = ctx;
     const name = ctx.config.level && LEVELS[ctx.config.level] ? ctx.config.level : DEFAULT_LEVEL;
+    this._install(name, ctx);
+
+    /**
+     * Load a different level at runtime.
+     *
+     * A REQUEST event, not a direct call, for the same reason `world/rotate-request`
+     * is: the asker (src/campaign) decides WHEN, this subsystem decides HOW, and
+     * ARCHITECTURE.md §3.3 stays intact because neither imports the other.
+     */
+    ctx.on('level/load-request', (payload) =>
+      this.loadLevel(typeof payload === 'string' ? payload : payload?.name, ctx));
+  },
+
+  /**
+   * Swap in a level, disposing whatever was there.
+   *
+   * The InstancedMesh is sized to the level's cell count, so a level change is a
+   * rebuild rather than a re-fill. That is the right trade: it happens once per
+   * completed puzzle and never per frame, whereas sizing one buffer to the largest
+   * level would make every level pay that cost in instances and in instanceColor
+   * upload, forever.
+   *
+   * @returns {boolean} whether a level was loaded
+   */
+  loadLevel(name, ctx = this._ctx) {
+    if (!name || !LEVELS[name]) return false;
+    this._teardownMesh();
+    this._install(name, ctx);
+    return true;
+  },
+
+  /** Release the current mesh's GPU resources. Leaking here grows every level change. */
+  _teardownMesh() {
+    if (!this.mesh) return;
+    this.mesh.removeFromParent();
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+    this.mesh = null;
+  },
+
+  /** Build the mesh for `name` and announce it. Shared by init and loadLevel. */
+  _install(name, ctx = this._ctx) {
     this.level = LEVELS[name];
     this.structure = new Structure(this.level.cells);
     this.turns = 0;
@@ -193,8 +235,7 @@ export default {
   },
 
   dispose() {
-    this.mesh?.geometry.dispose();
-    this.mesh?.material.dispose();
+    this._teardownMesh();
   },
 };
 
