@@ -133,12 +133,122 @@ function shelf03() {
   };
 }
 
+/**
+ * THE SECOND FIGURE FAMILY — a four-leg circuit that doubles back on an axis.
+ *
+ * WHY A SECOND FAMILY WAS NEEDED, AND WHY IT HAS FOUR LEGS. Every level above
+ * is a tribar, and that is forced rather than lazy: enumerating all three-leg
+ * closed circuits with legs 1..8 gives 48 hits and EVERY ONE has its three legs
+ * equal. The tribar family has exactly one degree of freedom — size. Escaping
+ * it needs a different leg count.
+ *
+ * Only three axes exist, so a four-leg circuit must reuse one. Reusing the same
+ * direction merely splits a leg and the figure is still a tribar; reusing the
+ * OPPOSITE direction doubles back, which is the genuinely new shape. All three
+ * levels below do that: +x with -x, or +y with -y.
+ *
+ * Closure is the same algebra as the tribar: net displacement must be a
+ * positive multiple of (1,1,1), so the far end aliases the near end on screen
+ * and sits in front of it. See tools/search.mjs for the full filter cascade and
+ * Structure.enclosedHoles for the criterion that rejects the circuits which
+ * project as ordinary slabs.
+ */
+function circuit(legs) {
+  const STEP = {
+    '+x': [1, 0, 0], '-x': [-1, 0, 0],
+    '+y': [0, 1, 0], '-y': [0, -1, 0],
+    '+z': [0, 0, 1], '-z': [0, 0, -1],
+  };
+  const cells = [[0, 0, 0]];
+  let cur = [0, 0, 0];
+  for (const [dir, len] of legs) {
+    for (let i = 0; i < len; i++) {
+      cur = [cur[0] + STEP[dir][0], cur[1] + STEP[dir][1], cur[2] + STEP[dir][2]];
+      cells.push([...cur]);
+    }
+  }
+  return cells;
+}
+
+/**
+ * arm-04 — four turns. A triangle with a beam driven THROUGH it.
+ *
+ * The most visually distinct figure in the project: the -x leg carries the
+ * circuit back across its own opening, so a bar appears to pass through the
+ * triangle it is part of. Chosen over three near-identical alternatives at the
+ * same turn count precisely because it does not look like the others.
+ *
+ * The arm is a three-cell +z run off the standing leg, carrying the start.
+ */
+function arm04() {
+  return {
+    name: 'arm-04',
+    cells: [
+      ...circuit([['+x', 6], ['+z', 4], ['+y', 4], ['-x', 2]]),
+      [6, 1, 5], [6, 1, 6], [6, 1, 7],
+    ],
+    start: [6, 1, 5],
+    goal: [6, 0, 3],
+    premise: { turn: true, illusion: true, minWalks: 12, minTurns: 4, openWithWalk: true },
+  };
+}
+
+/**
+ * perch-05 — five turns. A closed loop with the goal raised above it.
+ *
+ * The circuit doubles back on z and climbs, and a single cell hung on top of
+ * the far leg carries the goal. One cell rather than a run, so the figure stays
+ * a clean loop and the goal reads as sitting ON the structure rather than as a
+ * separate object stuck to it.
+ */
+function perch05() {
+  return {
+    name: 'perch-05',
+    cells: [
+      ...circuit([['-z', 2], ['+y', 4], ['+z', 6], ['+x', 4]]),
+      [0, 5, 2],
+    ],
+    start: [0, 4, -2],
+    goal: [0, 0, 0],
+    premise: { turn: true, illusion: true, minWalks: 10, minTurns: 5, openWithWalk: true },
+  };
+}
+
+/**
+ * crook-06 — six turns, the deepest route in the project.
+ *
+ * The only level whose circuit doubles back on the VERTICAL axis (+y against
+ * -y) rather than a horizontal one, which is why its silhouette stands upright
+ * where every other figure here lies along the ground plane.
+ *
+ * Fewest walks of the three (5) against the most turns (6), so it is the level
+ * where rotation carries the most weight relative to walking. If any level in
+ * the campaign proves tedious rather than clever, expect it to be this one --
+ * findRoute costs a turn and a walk equally, which is a recorded open decision
+ * from P5 and not yet backed by evidence about what a player actually enjoys.
+ */
+function crook06() {
+  return {
+    name: 'crook-06',
+    cells: [
+      ...circuit([['+x', 3], ['-y', 2], ['+z', 3], ['+y', 5]]),
+      [2, 0, 3], [1, 0, 3],
+    ],
+    start: [2, 0, 3],
+    goal: [3, 3, 3],
+    premise: { turn: true, illusion: true, minWalks: 5, minTurns: 6, openWithWalk: true },
+  };
+}
+
 export const LEVELS = {
   'loop-01': loop01(),
   'probe-01': probe01(),
   'spur-01': spur01(),
   'span-02': span02(),
   'shelf-03': shelf03(),
+  'arm-04': arm04(),
+  'perch-05': perch05(),
+  'crook-06': crook06(),
 };
 
 export const DEFAULT_LEVEL = 'loop-01';
@@ -156,6 +266,21 @@ export const DEFAULT_LEVEL = 'loop-01';
  * tribar with nothing hung off it. As an opener that is the cleanest possible
  * statement of what this game is. The turn is introduced immediately after.
  *
- * The curve is then the measured `minTurns` of each level: 0, 1, 2, 3.
+ * The curve is then the measured `minTurns` of each level: 0, 1, 2, 3, 4, 5, 6.
+ *
+ * The run changes FAMILY at shelf-03 -> arm-04, not just difficulty. The first
+ * four levels are one tribar at four sizes; the last three are four-leg
+ * circuits that double back. That break is deliberate and is the point of the
+ * phase — a player who has learned to read a tribar meets a figure that does
+ * not resolve the same way, at the moment the turn count starts to bite.
+ *
+ * Each minTurns is the MEASURED turnsInRoute for that level's start/goal pair,
+ * never a slack bound. levels.test.js asserts `turnsInRoute >= minTurns`, so
+ * declaring 4 on a route that takes 6 would pass every test while making this
+ * curve meaningless — which is the silent-drift failure the premise system was
+ * built to close.
  */
-export const ORDER = ['loop-01', 'spur-01', 'span-02', 'shelf-03'];
+export const ORDER = [
+  'loop-01', 'spur-01', 'span-02', 'shelf-03',   // tribar, sizes 5/3/4/5
+  'arm-04', 'perch-05', 'crook-06',              // four-leg doubled-back circuit
+];
