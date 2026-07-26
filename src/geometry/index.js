@@ -281,6 +281,35 @@ export class Structure {
   }
 
   /**
+   * Everything a level declares about itself, measured.
+   *
+   * `requiresTurn` is defined against turn 0 alone, because that is the state
+   * every level opens in. If a flat path exists there the player never has to
+   * turn, whatever the other three rotations do -- which is exactly how
+   * loop-01 passed a "requiresRotation" assert while needing zero turns.
+   */
+  premise(fromCell, toCell) {
+    const route = this.findRoute(fromCell, toCell);
+    const flat = [0, 1, 2, 3].map((t) => this.findPath(fromCell, toCell, t));
+    const illusion = [0, 1, 2, 3].map((t) =>
+      new Set(this.impossibleEdges(t).map((e) => `${e.from}>${e.to}`)));
+
+    const walks = (route ?? []).filter((m) => m.kind === 'walk');
+    const illusionWalks = walks.filter((m) => illusion[m.turns].has(`${m.from}>${m.to}`));
+
+    return {
+      solvable: route !== null,
+      requiresTurn: route !== null && flat[0] === null,
+      turnsInRoute: (route ?? []).filter((m) => m.kind === 'turn').length,
+      walksInRoute: walks.length,
+      usesIllusion: illusionWalks.length > 0,
+      illusionWalks: illusionWalks.length,
+      flatSolvableTurns: [0, 1, 2, 3].filter((t) => flat[t]),
+      route,
+    };
+  }
+
+  /**
    * Is the goal reachable in ANY rotation state, and does reaching it require
    * one? A puzzle solvable without rotating is not a puzzle.
    */
