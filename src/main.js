@@ -2,6 +2,9 @@ import { makeConfig } from './core/config.js';
 import { Engine } from './core/engine.js';
 import render from './render/index.js';
 import world from './world/index.js';
+import player from './player/index.js';
+import ui from './ui/index.js';
+import audio from './audio/index.js';
 import { makeShots } from './dev/shots.js';
 
 /**
@@ -20,7 +23,13 @@ const BOOT_FRAMES = 2;
 const config = makeConfig();
 const engine = new Engine(config);
 
+// Registration order is the update order. render is first so ctx.engine.scene
+// exists for everyone else; world emits level/loaded, so it must be added after
+// player has had a chance to subscribe.
 await engine.add(render);
+await engine.add(player);
+await engine.add(ui);
+await engine.add(audio);
 await engine.add(world);
 
 const shots = makeShots(engine.ctx);

@@ -18,6 +18,7 @@ export default {
   name: 'world',
 
   async init(ctx) {
+    this._ctx = ctx;
     const name = ctx.config.level && LEVELS[ctx.config.level] ? ctx.config.level : DEFAULT_LEVEL;
     this.level = LEVELS[name];
     this.structure = new Structure(this.level.cells);
@@ -40,6 +41,8 @@ export default {
 
     ctx.engine.level = this.level;
     ctx.engine.structure = this.structure;
+
+    ctx.emit('level/loaded', this.level);
   },
 
   /**
@@ -71,9 +74,11 @@ export default {
     this.mesh.instanceColor.needsUpdate = true;
   },
 
-  setRotation(turns) {
+  setRotation(turns, ctx = this._ctx) {
+    const from = this.turns;
     this.turns = ((turns % 4) + 4) % 4;
     this._applyRotation();
+    if (from !== this.turns) ctx?.emit('world/rotated', { from, to: this.turns });
     return this.turns;
   },
 

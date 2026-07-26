@@ -113,7 +113,25 @@ integration apply it.
 | `src/dev` | shot registry, debug overlays | independent |
 | `tools` | capture, diff, profile, gate | independent |
 
-### 3.3 Fan-out rule
+### 3.3 Event vocabulary
+
+Subsystems talk through `ctx.emit(event, payload)` / `ctx.on(event, fn)` and
+never by importing each other. The only permitted direct reach is
+`ctx.peek(name)` for a read, and `src/geometry` which is a pure module with no
+engine state.
+
+| Event | Emitted by | Payload |
+|---|---|---|
+| `player/moved` | `player` | `{ from, to, viaIllusion }` — cell ids; `viaIllusion` is true when the edge was not 3D-adjacent |
+| `player/blocked` | `player` | `{ from, direction }` — attempted a step with no edge |
+| `world/rotated` | `world` | `{ from, to }` — quarter-turn indices |
+| `level/loaded` | `world` | `{ name, cells, start, goal }` |
+| `level/solved` | `player` | `{ moves, turns }` |
+
+**An event may not carry a timestamp.** Anything time-derived must be read from
+`ctx.time` at the point of use, or the payload becomes a nondeterminism channel.
+
+### 3.4 Fan-out rule
 
 **Coupled directories get a single sequential owner. Only independent
 directories are fanned out in parallel.**
