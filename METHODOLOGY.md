@@ -820,6 +820,115 @@ independent captures.
 
 ---
 
+## P7 — the campaign spine
+
+**Completed 2026-07-26.** The four campaign levels can now be played end to end.
+
+### What was actually missing
+
+The mechanic was proven and gated. What was missing was everything *between* one
+level and the next: `world` resolved the level from boot config at `init` and sized
+its `InstancedMesh` there, so `?level=` was the only route to a different one. That
+was scoped out of P5 deliberately, and it was the blocker.
+
+The blast radius turned out to be small, because the event already existed and the
+other subsystems already handled it: `src/player` resets its cell, counters, caches
+and any in-flight move on `level/loaded`, and `src/render` cancels any transition.
+A correct `loadLevel` is therefore: dispose the mesh, rebuild, reset rotation,
+re-emit. Nothing else needed to know.
+
+Sequencing lives in a new `src/campaign` subsystem, which asks for the next level
+with `level/load-request` — the same request shape `ui` uses to ask `render` for a
+rotation. It reads the order through `ctx.peek('world').order` rather than importing
+`src/world/levels.js`, because §3.3 permits subsystems to reach each other only
+through `peek` for a read.
+
+### Two decisions worth defending
+
+**Progression is inert under `config.capture`.** It advances state in response to an
+event, which is the shape that makes captures nondeterministic, and the gate is this
+project's artifact. The honest cost: that path is covered by unit tests only — the
+same class of gap P6 had just closed for motion, reopened deliberately elsewhere. It
+also closes a foot-gun rather than only a present risk: `stepmid` already calls
+`player.step()` during a capture, and a future motion shot that stepped onto a *goal*
+would otherwise load a level mid-capture.
+
+*Guard verified to fail:* forcing `enabled = true` fails the inertness test.
+
+**The advance is frame-counted, not immediate.** Loading inside the `level/solved`
+handler would re-enter `player.step()` while it is still executing — `level/loaded`
+resets the player's cell and counters mid-call — and would teleport the player the
+instant they touched the goal, with no beat to register the win. So it is a countdown
+in frames served from `update()`. Frames, never wall-clock: §1 forbids `setTimeout`,
+and a frame count is a pure function of the fixed timestep.
+
+### An off-by-one that only looking could catch
+
+The HUD showed **`1 / 4` while playing level 2**.
+
+`main.js` added `campaign` *after* `world`, and `world` emits `level/loaded` inside
+its own `init` — so the listener was registered too late to ever hear the opening
+level, and the index sat at 0. The eleven campaign unit tests all emitted
+`level/loaded` manually *after* init, so not one of them could have caught it. The
+rendered HUD caught it immediately.
+
+Fixed in both directions: `campaign` now registers before `world` (the rule `main.js`
+already documented for `player`), **and** seeds its index from `ctx.peek('world')` at
+init so registration order is no longer load-bearing. Regression test added.
+
+Fourth time in this repository that a change passed every automated check and was
+wrong in a way only looking could reveal — after the black `vertexColors` material,
+three visually-meaningless levels, and an orbit shot with a third of its subject out
+of frame.
+
+### The spec asked for work that did not need doing
+
+It called for per-level hint text to teach the controls, and argued hints would be a
+visible change requiring careful sequencing against the reference set.
+
+Both claims were wrong. `src/ui` already carries a permanent legend — `↑←↓→ Move`,
+`Q E Rotate` — so the onboarding existed. And `src/ui/index.js:315` sets the HUD root
+to `display: none` under `config.capture`, so **nothing in the HUD reaches a plate**
+and no sequencing was needed either way. No hint was added.
+
+What was genuinely missing was campaign *feedback*: the HUD named the level but not
+the position in the run, and `campaign/complete` fired into nothing.
+
+### `ORDER` opens with `loop-01`, reversing this phase's own spec
+
+The spec said `loop-01` "teaches nothing and wins itself" because it solves in one
+move. That one move **is** the mechanic — a single sideways step across fourteen
+units — and `loop-01` is the only level whose figure is the bare tribar with nothing
+hung off it. As an opener that is the cleanest statement of what the game is; the
+turn is introduced immediately after. The curve is then the measured `minTurns` of
+each level: 0, 1, 2, 3, asserted by test as non-decreasing.
+
+### Verification
+
+| check | result |
+|---|---|
+| `npm test` | 166 pass, 0 fail |
+| capture inertness | verified to fail when forced on |
+| mesh-leak guard | verified to fail when teardown removed |
+| `analyze` × 5 levels | all exit 0 |
+| `npm run gate` | `identical: true` across 15 shots |
+| 15 references, before and after | `maxDelta: 0` — the spine is invisible to the gate |
+| **played end to end** | loop-01 1 move, spur-01 7, span-02 8, shelf-03 8, `campaign/complete`, zero page errors |
+
+The playthrough runs with `lockstep=1` but `capture=0`, so `src/campaign` is enabled —
+it exercises precisely the path the pixel gate does not cover.
+
+### Still open
+
+- **Four levels is a spine, not a game.** Three of them are tribars; the second figure
+  family is unbuilt. A four-leg closed circuit was proven constructible (18 exist) and
+  the first one rendered read as an ordinary solid, not an impossible figure — so that
+  family needs the render-and-judge loop, not just the search.
+- No persistence: a refresh restarts the run.
+- No ending beyond a HUD line.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
