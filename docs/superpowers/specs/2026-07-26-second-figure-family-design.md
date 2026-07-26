@@ -121,9 +121,9 @@ as impossible; nine read as ordinary frames, slabs or notched blocks.
 That metric does not discriminate at all, which is worth knowing before anyone
 tries to rank candidates by it.
 
-The single most useful measurement is that the visual judgement and the routing
-depth agree. `+x×6 +y×4 -x×2 +z×4` was judged impossible on sight, and it is also
-the deepest-routing figure in the pool.
+The single most useful measurement is that visual judgement and routing depth
+agree: `+x×6 +y×4 -x×2 +z×4` was judged impossible on sight, and figures of that
+shape are also the deepest-routing in the pool.
 
 ### 3.1 The validated set
 
@@ -139,9 +139,28 @@ their spur:
 | 7 | `-z×2 +x×3 +z×5 +y×3` | `+y×2` from `1,0,-2` | 16 | 6 | 6 |
 | 8 | `+x×3 -y×2 +z×3 +y×5` | `-x×2` from `3,0,3` | 16 | 6 | 5 |
 
-Rows 1/2 and 4/7 are mirror pairs, so this is **three distinct figures**, not
-five. Row 1 is a cyclic rotation of the `+x×6 +y×4 -x×2 +z×4` judged above — the
-same figure entered from a different leg.
+Rows 1/2 and 4/7 are mirror pairs under the `x↔z` swap, which flips the screen
+horizontally, so this is **three distinct figures** rather than five.
+
+**CORRECTION, measured after this spec was first written.** An earlier draft said
+row 1 was "a cyclic rotation of `+x×6 +y×4 -x×2 +z×4` — the same figure entered
+from a different leg". It is not. Verified:
+
+```
+same 3D cell set (up to translation)?  false
+same SCREEN outline?                   false
+```
+
+The circuit closes **on screen** but not in 3D — the net is `(4,4,4)`, not zero —
+so reordering the legs traces a genuinely different shape. The two were conflated
+because their statistics are *identical*: 17 cells, 9 holes, 2 illusion edges, 12
+standable. That is the same trap as the illusion-edge count one paragraph above,
+and it is worth stating twice: **matching metrics are not a matching figure.**
+
+The conclusion is unaffected — both were judged to read as impossible, but on two
+separate renders rather than as one figure seen twice. The pool of validated
+shapes is therefore slightly larger than a single judgement would suggest, not
+smaller.
 
 Rows 3, 5, 6 and 9 of that render are recorded as rejected so nobody re-derives
 them: `-x×2 +z×2 +x×4 +y×2`, `+z×6 +y×2 -z×4 +x×2`, `-z×2 +x×2 +z×4 +y×2` and

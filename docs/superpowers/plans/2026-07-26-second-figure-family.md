@@ -327,7 +327,7 @@ The previous phase discarded its search scaffolding, which is why its "18 four-l
 **Files:**
 - Create: `tools/search.mjs`
 
-- [ ] **Step 1: Write the tool**
+- [x] **Step 1: Write the tool**
 
 ```js
 #!/usr/bin/env node
@@ -457,7 +457,7 @@ if (args.json) {
 }
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 ```bash
 node tools/search.mjs
@@ -471,15 +471,22 @@ Expected — every number must match the spec's §2 table exactly:
   carries at least one illusion edge                     440
   >=8 distinct screen cells                              400
   ENCLOSES A HOLE                                        330
-  non-degenerate (doubles back, min leg 2, >=9, <=20)    ???
+  non-degenerate (doubles back, min leg 2, >=9, <=20)    102
   distinct up to translation                             102
 ```
 
-The `nonDegenerate` count was not separately recorded when the spec was written, so it is the one number without a prior value — record whatever it reports and add it to the spec table.
+CONFIRMED 2026-07-26 — all seven numbers as above. The `nonDegenerate` count is
+**102**, the one value that had no prior record.
+
+Note it equals the distinct count: the translation dedupe removes **nothing**.
+That is correct and initially surprising. These circuits close on SCREEN but not
+in 3D — the net is a positive multiple of `(1,1,1)`, never zero — so reordering
+the legs traces a genuinely different shape rather than the same loop from a
+different starting point. See the correction in spec §3.1.
 
 **If any of the other six differs, stop.** The `ENCLOSES A HOLE` row is the load-bearing one: it is produced by `enclosedHoles()` from Task 1, and a mismatch means the committed detector does not agree with the throwaway probe the spec's numbers came from. That is a defect in Task 1, not a reason to edit the expectation.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tools/search.mjs
