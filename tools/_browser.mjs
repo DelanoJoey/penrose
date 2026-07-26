@@ -15,6 +15,20 @@
 
 const isMac = process.platform === 'darwin';
 
+/**
+ * Force a software rasteriser, to reproduce CI locally.
+ *
+ * CI has no GPU and rasterises via SwiftShader. METHODOLOGY.md records a 20x
+ * wall-clock regression that three profiler runs on this machine could not
+ * see, because the structural budget counts objects rather than the cost of
+ * rasterising them. A perf claim measured on a GPU is not evidence about CI.
+ */
+const forceSoftware = process.env.PENROSE_GL === 'swiftshader';
+
+/** GPU backend flags, or the software rasteriser when forced. */
+const glArgs = () =>
+  forceSoftware ? ['--use-gl=swiftshader'] : isMac ? ['--use-angle=metal'] : [];
+
 const COMMON = [
   '--ignore-gpu-blocklist',
   '--mute-audio',
@@ -28,7 +42,7 @@ export function captureArgs() {
     ...COMMON,
     '--force-color-profile=srgb',
     '--force-device-scale-factor=1',
-    ...(isMac ? ['--use-angle=metal'] : []),
+    ...glArgs(),
   ];
 }
 
@@ -37,10 +51,11 @@ export function profileArgs() {
   return [
     ...COMMON,
     '--disable-gpu-vsync',
-    ...(isMac ? ['--use-angle=metal'] : []),
+    ...glArgs(),
   ];
 }
 
-export const platformNote = isMac
+export const platformNote = (isMac
   ? 'darwin / ANGLE-Metal'
-  : `${process.platform} / default backend (SwiftShader on GPU-less CI)`;
+  : `${process.platform} / default backend (SwiftShader on GPU-less CI)`
+) + (forceSoftware ? ' / forced swiftshader' : '');
