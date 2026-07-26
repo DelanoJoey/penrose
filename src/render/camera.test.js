@@ -419,6 +419,110 @@ test('the whole transition is a pure function of the frame index', () => {
   assert.deepEqual(a, b);
 });
 
+// ========================================================= tone convention
+/**
+ * THE CONVENTION, MECHANISED.
+ *
+ * The camera-orbit == world-turn identity is a statement about a RIGID
+ * rotation of the scene. src/world used to write translation-only instance
+ * matrices, so the cells moved but their normals — and therefore their baked
+ * face tones — did not, and the two sides of the rotation commit disagreed by
+ * a measured 3.1891% of pixels, maxDelta 48.
+ *
+ * The art direction fixes tone to the OBJECT (a print has inks, not a key
+ * light), so a world turn must be a true rigid rotation. That is a property of
+ * the instance matrices and is therefore checkable without a renderer: every
+ * instance matrix at turn T must equal Ry(T * 90deg) times the same instance's
+ * matrix at turn 0. If anyone ever reverts to makeTranslation, or rotates the
+ * position without rotating the basis, this fails immediately rather than
+ * silently reintroducing a swap on the one frame that has to look settled.
+ */
+async function makeWorld() {
+  const { default: world } = await import('../world/index.js');
+  const scene = { add() {} };
+  const ctx = {
+    config: { level: 'loop-01', capture: true, lockstep: true },
+    engine: { scene },
+    peek: () => null,
+    on: () => () => {},
+    emit: () => {},
+  };
+  const w = Object.create(world);
+  await w.init(ctx);
+  return w;
+}
+
+/** Every instance matrix at the current rotation, as flat arrays. */
+function instanceMatrices(w) {
+  const out = [];
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < w.mesh.count; i++) {
+    w.mesh.getMatrixAt(i, m);
+    out.push(m.elements.slice());
+  }
+  return out;
+}
+
+const worstElementDelta = (a, b) =>
+  a.reduce((acc, row, i) => Math.max(acc, ...row.map((v, k) => Math.abs(v - b[i][k]))), 0);
+
+test('a world turn is a RIGID rotation — tone rotates with the geometry', async () => {
+  const w = await makeWorld();
+  const at0 = instanceMatrices(w);
+
+  for (const turns of [1, 2, 3]) {
+    w.setRotation(turns);
+    const atT = instanceMatrices(w);
+
+    const R = new THREE.Matrix4().makeRotationY(turns * TURN_RADIANS);
+    const expected = at0.map((e) =>
+      new THREE.Matrix4().multiplyMatrices(R, new THREE.Matrix4().fromArray(e)).elements.slice());
+
+    assert.equal(atT.length, expected.length);
+    const worst = worstElementDelta(atT, expected);
+    assert.ok(worst < 1e-12,
+      `turn ${turns}: instance matrices are not R * (turn 0), worst element delta ${worst}`);
+  }
+});
+
+test('the negative control: a translation-only convention FAILS that test', () => {
+  // What src/world used to write. Position rotates, basis does not — so the
+  // scene is not a rigid rotation and the face tones stay keyed to the screen.
+  const cell = new THREE.Vector3(5, 3, 2);
+  const R = new THREE.Matrix4().makeRotationY(TURN_RADIANS);
+  const translationOnly = new THREE.Matrix4().makeTranslation(
+    ...rotateY([cell.x, cell.y, cell.z], 1));
+  const rigid = new THREE.Matrix4().multiplyMatrices(
+    R, new THREE.Matrix4().makeTranslation(cell.x, cell.y, cell.z));
+
+  const worst = worstElementDelta([translationOnly.elements.slice()], [rigid.elements.slice()]);
+  assert.ok(worst > 0.5, `the two conventions should differ, worst delta ${worst}`);
+});
+
+test('the misregistered plate is displaced along the orbit axis only', async () => {
+  // -Y is the only displacement invariant under both a camera orbit about Y
+  // and a world quarter turn. Anything with an x or z component would slide
+  // during a rotation and pop at the commit.
+  const w = await makeWorld();
+  const n = w.level.cells.length;
+  assert.equal(w.mesh.count, n * 2, 'one plate plus one second impression');
+
+  const a = new THREE.Matrix4(), b = new THREE.Matrix4();
+  for (const turns of [0, 1, 2, 3]) {
+    w.setRotation(turns);
+    for (let i = 0; i < n; i++) {
+      w.mesh.getMatrixAt(i, a);
+      w.mesh.getMatrixAt(n + i, b);
+      const dx = b.elements[12] - a.elements[12];
+      const dy = b.elements[13] - a.elements[13];
+      const dz = b.elements[14] - a.elements[14];
+      assert.ok(Math.abs(dx) < 1e-12 && Math.abs(dz) < 1e-12,
+        `turn ${turns}, instance ${i}: off-axis displacement (${dx}, ${dz})`);
+      assert.ok(dy < 0, `turn ${turns}, instance ${i}: must sit BEHIND, dy=${dy}`);
+    }
+  }
+});
+
 test('no wall clock, no rng, no timer, no rAF in this subsystem', () => {
   // Mechanical restatement of ARCHITECTURE.md §1 against the module source.
   // Comment lines are stripped so this tests the code, not the prose.

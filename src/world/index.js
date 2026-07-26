@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { paintByNormal, PALETTE } from '../render/index.js';
+import { paintByNormal, PALETTE, INK, hash01, TURN_RADIANS } from '../render/index.js';
 import { Structure, rotateY, cellId } from '../geometry/index.js';
 import { LEVELS, DEFAULT_LEVEL } from './levels.js';
 
@@ -14,6 +14,26 @@ import { LEVELS, DEFAULT_LEVEL } from './levels.js';
 
 const CELL = 1.0;
 
+/**
+ * Impressions per cell: the plate, then the misregistered second pass.
+ *
+ * Both live in the SAME InstancedMesh, so the off-register costs exactly zero
+ * additional draw calls and zero additional programs — it is 16 more instances
+ * on a buffer that was already there.
+ */
+const IMPRESSIONS = 2;
+
+/** Neutral instance tint. Hoisted so _applyRotation allocates nothing. */
+const ONE = [1, 1, 1];
+
+/**
+ * Scale of the misregistered second impression. Full height — the -Y drop is
+ * what makes it show — but pulled in on x and z so its side faces are not
+ * coplanar with the first impression's. See INK.ghostInset.
+ */
+const GHOST_SCALE = /* @__PURE__ */ new THREE.Vector3(
+  1 - 2 * INK.ghostInset / CELL, 1, 1 - 2 * INK.ghostInset / CELL);
+
 export default {
   name: 'world',
 
@@ -27,14 +47,17 @@ export default {
     const box = paintByNormal(new THREE.BoxGeometry(CELL, CELL, CELL));
     const material = new THREE.MeshBasicMaterial({ vertexColors: true });
 
-    this.mesh = new THREE.InstancedMesh(box, material, this.level.cells.length);
+    const instances = this.level.cells.length * IMPRESSIONS;
+    this.mesh = new THREE.InstancedMesh(box, material, instances);
     this.mesh.frustumCulled = false;
 
     // instanceColor multiplies the geometry's per-face vertex colours, so white
     // leaves the three-tone read intact and a tint marks a cell without
-    // introducing a second material or a second draw call.
+    // introducing a second material or a second draw call. It is also how ink
+    // density, the knockout marker and the misregistered plate are all paid for
+    // out of the same buffer — see _applyRotation.
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(
-      new Float32Array(this.level.cells.length * 3).fill(1), 3);
+      new Float32Array(instances * 3).fill(1), 3);
 
     this._applyRotation();
     ctx.engine.scene.add(this.mesh);
@@ -52,40 +75,103 @@ export default {
    * whole model is integer lattice positions, and interpolating between them
    * would put cells at non-integer coordinates where the screen-position
    * invariant does not hold. Animating the CAMERA between the four states is
-   * the correct way to make this feel continuous, and belongs to P2.
+   * the correct way to make this feel continuous, and src/render does.
+   *
+   * ================= THE TONE CONVENTION, RESOLVED HERE =================
+   *
+   * This function used to write `makeTranslation`. A world quarter turn
+   * therefore moved every cell to its rotated position but left every cell's
+   * NORMALS — and so its baked face tones — pointing the way they always had.
+   * That is not a rigid rotation of the scene, and the camera-orbit ==
+   * world-turn identity src/render rests on is a statement about a RIGID
+   * rotation. So the orbit carried tone around with the geometry while the
+   * commit did not, and the two disagreed on exactly one frame: measured at
+   * 3.1891% of pixels, maxDelta 48, which is exactly |faceLeft.r-faceRight.r|.
+   *
+   * Composing the rotation into the instance matrix is the fix, and under this
+   * art direction it is not a trade-off at all — it is the only convention that
+   * means anything.
+   *
+   * THE ARGUMENT, WHICH IS ABOUT INK AND NOT ABOUT LIGHT
+   *
+   * The alternative convention is "the light is fixed to the screen": tone is
+   * keyed to a screen-space direction, so the key light never moves however the
+   * object turns. That is coherent, and for a lit, rendered object it is
+   * arguably the nicer one — every static view is lit identically.
+   *
+   * But this direction prints; it does not light. A face is Federal Blue
+   * because the blue drum laid ink on it, and ink is a property of the object,
+   * not of where the viewer is standing. Screen-fixed tone would mean the ink
+   * migrates across the paper when you turn the emblem, which is not a stylised
+   * lighting model — it is a physically meaningless one. So the ±x plate stays
+   * the ±x plate through every quarter turn, and turning the object to an odd
+   * rotation genuinely exchanges which plate you are looking at. That exchange
+   * IS the picture changing, honestly, rather than a defect at the commit.
+   *
+   * The convention also costs nothing structurally, which the other one cannot
+   * match: screen-fixed tone through a 90-degree orbit needs either a per-frame
+   * vertex-colour repaint or a second shader program, and both are exactly the
+   * regressions ARCHITECTURE.md §6 and the upstream postmortem warn about. This
+   * is one extra matrix op per instance, at rotation time only.
+   *
+   * MEASURED CONSEQUENCE: the commit-frame delta goes 3.1891% / 48 -> 0% / 0.
+   * The end-swap is now provably pixel-clean, which is what src/render's note
+   * said would happen once this landed.
    */
   _applyRotation() {
     const m = new THREE.Matrix4();
     const startId = cellId(...this.level.start);
     const goalId = cellId(...this.level.goal);
-    const accent = new THREE.Color(PALETTE.accent);
+    const n = this.level.cells.length;
+    const angle = this.turns * TURN_RADIANS;
 
     this.level.cells.forEach((cell, i) => {
       const [x, y, z] = rotateY(cell, this.turns);
-      // ROTATE, then translate — not translate alone.
+      // See the block comment above: composing the rotation is what makes a world
+      // turn a TRUE rigid rotation, so the turn and the camera orbit are the same
+      // transform and the commit frame is pixel-identical to the frame before it.
       //
-      // The cube's silhouette is unchanged by a 90-degree turn about Y, so this
-      // looks like a no-op. It is not: paintByNormal bakes face tone onto
-      // WORLD-space normals, so a translation-only matrix leaves those normals
-      // pointing the same way and the tone stays keyed to the screen, while a
-      // camera orbit carries tone around with the geometry. The two disagreed,
-      // and the disagreement surfaced as a colour swap on the last frame of
-      // every rotation - measured at 3.1891% of pixels, maxDelta 48, where 48
-      // is exactly |faceLeft.r - faceRight.r| = |0xd9 - 0xa9|.
+      // makeRotationY(+90deg) maps (x,y,z) -> (z,y,-x), which is exactly what
+      // src/geometry's rotateY does to the position, so the two stay in step.
       //
-      // Composing the rotation makes a world turn a true rigid rotation, so the
-      // turn and the orbit are the same transform and the commit frame is
-      // pixel-identical to the frame before it. Convention: LIGHT FIXED IN THE
-      // WORLD. Consequence, accepted deliberately: at odd rotations the two side
-      // tones are exchanged relative to turn 0, because you are genuinely
-      // looking at a different pair of faces.
-      m.makeRotationY(this.turns * Math.PI / 2);
+      // Independently re-measured on this branch before the merge:
+      //   before  changedPct 3.1891, maxDelta 48, identical false
+      //   after   changedPct 0,      maxDelta 0,  identical true
+      // maxDelta 48 was exactly |faceLeft.r - faceRight.r| = |0xd9 - 0xa9|, so
+      // the whole residual was provably this and nothing else.
+      m.makeRotationY(angle);
       m.setPosition(x * CELL, y * CELL, z * CELL);
       this.mesh.setMatrixAt(i, m);
 
+      // The misregistered second impression. Displaced along -Y ONLY: -Y is the
+      // orbit axis, so this offset survives both the camera orbit and the world
+      // turn unchanged — the off-register can never slide, parallax or pop
+      // during a rotation, which a screen-space or view-axis offset would. -Y
+      // is also uniformly further from the camera under depth = x+y+z, so the
+      // second impression can only show where the first does not already cover
+      // it. No render order, no depth state, no second material.
+      //
+      // The x/z inset is what stops the two impressions' side faces being
+      // coplanar; see INK.ghostInset for why that is not optional.
+      m.makeRotationY(angle);
+      m.scale(GHOST_SCALE);
+      m.setPosition(x * CELL, y * CELL - INK.ghostDropY, z * CELL);
+      this.mesh.setMatrixAt(n + i, m);
+
+      // Ink density varies block to block. Keyed on the instance INDEX, never
+      // on the rotated position, so a quarter turn cannot reshuffle it — which
+      // would put the tone convention right back where it started.
+      const d = 1 + (hash01(i, 0x51ed) - 0.5) * 2 * INK.densityJitter;
+      const g = 1 + (hash01(i, 0x9a2b) - 0.5) * 2 * INK.densityJitter;
+
       const id = cellId(...cell);
-      const tint = (id === startId || id === goalId) ? accent : null;
-      this.mesh.instanceColor.setXYZ(i, tint ? tint.r : 1, tint ? tint.g : 1, tint ? tint.b : 1);
+      const knock = (id === startId || id === goalId) ? INK.knockout : ONE;
+
+      this.mesh.instanceColor.setXYZ(i, d * knock[0], d * knock[1], d * knock[2]);
+      this.mesh.instanceColor.setXYZ(n + i,
+        g * knock[0] * INK.ghost[0],
+        g * knock[1] * INK.ghost[1],
+        g * knock[2] * INK.ghost[2]);
     });
 
     this.mesh.instanceMatrix.needsUpdate = true;
