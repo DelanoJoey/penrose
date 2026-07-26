@@ -64,9 +64,34 @@ function probe01() {
   };
 }
 
+/**
+ * ledge-01 — the level that teaches the turn.
+ *
+ * A walkway you can see the whole of, and a tower whose top is not reachable
+ * from it. Walking runs out after two steps; the only thing left to try is Q or
+ * E, and one quarter turn brings the tower top into reach.
+ *
+ * This is the first level in the project where the goal cannot be reached in
+ * the rotation the level opens in — loop-01 and probe-01 are both solvable in
+ * one move without ever turning, which is why they declare turn: false.
+ */
+function ledge01() {
+  const cells = [];
+  for (let i = 0; i <= 4; i++) cells.push([i, 0, 0]);   // ground walkway
+  for (let j = 0; j <= 2; j++) cells.push([0, j, 1]);   // the tower
+  return {
+    name: 'ledge-01',
+    cells,
+    start: [0, 0, 0],
+    goal: [0, 2, 1],
+    premise: { turn: true, illusion: true, minWalks: 3, minTurns: 1, openWithWalk: true },
+  };
+}
+
 export const LEVELS = {
   'loop-01': loop01(),
   'probe-01': probe01(),
+  'ledge-01': ledge01(),
 };
 
 export const DEFAULT_LEVEL = 'loop-01';
