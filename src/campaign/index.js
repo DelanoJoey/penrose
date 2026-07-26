@@ -50,11 +50,15 @@ export default {
     this.complete = false;
     this._pending = 0;
 
+    // Seed from world if it has ALREADY loaded, so registration order is not
+    // load-bearing. main.js adds this subsystem before world so the event below
+    // is heard, but a future reorder must not silently reset the run to level 1.
+    this._sync(ctx.peek?.('world')?.level?.name);
+
     // Keep the index honest when a level arrives by any route, including
     // `?level=` and a direct loadLevel, not only through this subsystem.
     ctx.on('level/loaded', (level) => {
-      const i = this._order().indexOf(level?.name);
-      if (i >= 0) this.index = i;
+      this._sync(level?.name);
       this._pending = 0;
     });
 
@@ -62,6 +66,12 @@ export default {
       if (!this.enabled || this.complete || this._pending > 0) return;
       this._pending = ADVANCE_FRAMES;
     });
+  },
+
+  /** Point the index at `name` if it is part of the campaign. */
+  _sync(name) {
+    const i = this._order().indexOf(name);
+    if (i >= 0) this.index = i;
   },
 
   /** The campaign order, read from world. Empty if world is not present. */

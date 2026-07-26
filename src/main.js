@@ -31,11 +31,11 @@ await engine.add(render);
 await engine.add(player);
 await engine.add(ui);
 await engine.add(audio);
-await engine.add(world);
-// After world, so its first `level/loaded` sets the campaign index; and after
-// player, whose `level/solved` it listens for. Inert under capture (see the
-// header of src/campaign).
+// BEFORE world, for the same reason player is: world emits `level/loaded` inside
+// its own init, and a subscriber added afterwards never sees the opening level.
+// Registered after it, the campaign sat at index 0 while the HUD played level 2.
 await engine.add(campaign);
+await engine.add(world);
 
 const shots = makeShots(engine.ctx);
 
