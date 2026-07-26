@@ -44,6 +44,14 @@
  * frame reads as sagging. The fills are chosen so the set has a rhythm: two
  * plates at poster scale, one at print scale with a wide paper margin, and
  * three close reads.
+ *
+ * DECLARING A LEVEL. A shot may carry a `level` property naming the level it
+ * needs; tools/baseline.mjs then boots that page with `&level=<name>`. This is
+ * not optional plumbing — src/world reads the level from boot config and sizes
+ * its InstancedMesh at init, so a shot function CANNOT switch levels itself.
+ * A shot that declares nothing captures DEFAULT_LEVEL, and its URL is byte
+ * identical to what it has always been, which is what keeps the existing
+ * reference set valid across this change.
  */
 
 import { rotateY } from '../geometry/index.js';
