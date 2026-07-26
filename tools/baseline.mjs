@@ -30,7 +30,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? true] : [a, true];
 }));
 
-const PORT = Number(args.port ?? 5173);
+let PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1600);
 const H = Number(args.h ?? 1000);
 const SETTLE = Number(args.settle ?? 90);
@@ -44,26 +44,45 @@ const portOpen = (p) => new Promise((res) => {
   s.setTimeout(400, () => (s.destroy(), res(false)));
 });
 
-let server = null;
-if (!(await portOpen(PORT))) {
-  // --host 127.0.0.1 is not optional. Vite's default `localhost` resolves to
-  // ::1 on macOS, binding IPv6 only, while everything below talks IPv4.
-  // Passing it here as well as in vite.config.js means the harness does not
-  // silently depend on the config file being correct.
-  server = spawn(resolve(ROOT, 'node_modules/.bin/vite'),
-    ['--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
-    cwd: ROOT, stdio: 'ignore', env: { ...process.env, OW_NO_HMR: '1' },
-  });
-  let up = false;
-  for (let i = 0; i < 160 && !up; i++) { await new Promise((r) => setTimeout(r, 250)); up = await portOpen(PORT); }
-  if (!up) { server.kill(); throw new Error('vite failed to start'); }
+// The harness must never silently capture against a server it did not
+// start. This block used to skip spawning whenever anything answered on
+// PORT at all -- which included a vite dev server left running for a
+// DIFFERENT worktree. That one served every shot in an entire before/after
+// comparison, which came back maxDelta: 0 -- a "pass" that proved nothing,
+// because none of this branch's changes were ever in the page it hit. Now
+// the harness scans upward for a port nothing is listening on and always
+// spawns its own vite there, announcing the move if it had to happen. This
+// is a move, not an error: gate.mjs runs baseline.mjs twice in a row on the
+// same port, and a lingering socket from the first run must not fail the
+// second.
+const REQUESTED_PORT = PORT;
+let free = false;
+for (let i = 0; i < 20; i++) {
+  if (!(await portOpen(PORT))) { free = true; break; }
+  PORT++;
 }
+if (!free) throw new Error(`no free port found scanning ${REQUESTED_PORT}..${REQUESTED_PORT + 19}`);
+if (PORT !== REQUESTED_PORT) {
+  console.log(`[baseline] port ${REQUESTED_PORT} was busy — using ${PORT} instead. The harness never reuses a server it did not spawn.`);
+}
+
+// --host 127.0.0.1 is not optional. Vite's default `localhost` resolves to
+// ::1 on macOS, binding IPv6 only, while everything below talks IPv4.
+// Passing it here as well as in vite.config.js means the harness does not
+// silently depend on the config file being correct.
+const server = spawn(resolve(ROOT, 'node_modules/.bin/vite'),
+  ['--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
+  cwd: ROOT, stdio: 'ignore', env: { ...process.env, OW_NO_HMR: '1' },
+});
+let up = false;
+for (let i = 0; i < 160 && !up; i++) { await new Promise((r) => setTimeout(r, 250)); up = await portOpen(PORT); }
+if (!up) { server.kill(); throw new Error('vite failed to start'); }
 
 const browser = await chromium.launch({ headless: true, args: captureArgs() });
 
 mkdirSync(OUTDIR, { recursive: true });
 const report = {
-  ok: true, outDir: OUTDIR, size: `${W}x${H}`, isolated: true, settle: SETTLE,
+  ok: true, outDir: OUTDIR, port: PORT, size: `${W}x${H}`, isolated: true, settle: SETTLE,
   platform: platformNote, shots: [], errors: [],
 };
 
@@ -118,7 +137,7 @@ for (const { name, level } of wanted) {
 
 report.errors = report.shots.flatMap((s) => s.logs ?? []);
 await browser.close();
-if (server) server.kill();
+server.kill();
 
 writeFileSync(`${OUTDIR}/report.json`, JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
