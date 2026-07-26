@@ -91,14 +91,14 @@ const probe = await browser.newPage({ viewport: { width: W, height: H } });
 await probe.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
 await probe.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
 const all = await probe.evaluate(
-  'Object.entries(window.__SHOTS__ ?? {}).map(([name, fn]) => ({ name, level: fn.level ?? null }))');
+  'Object.entries(window.__SHOTS__ ?? {}).map(([name, fn]) => ({ name, level: fn.level ?? null, settle: fn.settle ?? null }))');
 await probe.close();
 
 const wanted = args.shots
-  ? String(args.shots).split(',').map((s) => s.trim()).map((n) => all.find((s) => s.name === n) ?? { name: n, level: null })
+  ? String(args.shots).split(',').map((s) => s.trim()).map((n) => all.find((s) => s.name === n) ?? { name: n, level: null, settle: null })
   : all;
 
-for (const { name, level } of wanted) {
+for (const { name, level, settle } of wanted) {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const logs = [];
   page.on('console', (m) => m.type() !== 'debug' && logs.push(`[${m.type()}] ${m.text()}`));
@@ -108,28 +108,55 @@ for (const { name, level } of wanted) {
       { waitUntil: 'domcontentloaded', timeout: 90000 });
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
 
-    const applied = await page.evaluate(
-      ({ s, settle }) => window.__APPLY_SHOT__(s, { grabFrame: settle }), { s: name, settle: SETTLE });
+    // A shot may declare the settle it needs; only a shot that does so is
+    // allowed to start an animation. See the MOTION SHOTS note in
+    // src/dev/shots.js for why that is the condition.
+    const frames = settle ?? SETTLE;
 
-    // Drop temporal history so accumulation starts from a known phase.
+    const applied = await page.evaluate(
+      ({ s, grab }) => window.__APPLY_SHOT__(s, { grabFrame: grab }), { s: name, grab: frames });
+
+    // Drop temporal history so accumulation starts from a known phase. For a
+    // motion shot this rewinds the in-flight orbit to phase 0 without cancelling
+    // it, so the pump count below maps directly onto the animation frame.
     await page.evaluate(() => {
       const r = window.__ENGINE__?.ctx?.peek?.('render');
       r?.resetTemporal?.();
     });
 
-    // LOCKSTEP: advance exactly SETTLE engine frames. The page runs no frame
+    // LOCKSTEP: advance exactly `frames` engine frames. The page runs no frame
     // loop of its own, so nothing advances during any of the round trips above
     // or during the screenshot below.
-    await page.evaluate((n) => window.__PUMP__(n), SETTLE);
+    await page.evaluate((n) => window.__PUMP__(n), frames);
     await page.evaluate(() => window.__PRESENT__(2));
+
+    // THE ASSERTION THAT STOPS THIS BEING THEATRE.
+    //
+    // A shot that declared a settle count is a MOTION shot. If nothing is
+    // actually in flight at the shutter, it captured a SETTLED frame — which
+    // would be perfectly reproducible, pass the gate forever, and cover
+    // nothing. That is the same shape as any green result that measured
+    // something other than what it claimed, so fail loudly instead.
+    const motion = await page.evaluate(() => ({
+      orbiting: window.__ENGINE__?.ctx?.peek?.('render')?.info?.().orbiting === true,
+      moving: window.__ENGINE__?.ctx?.peek?.('player')?.motionState?.().moving === true,
+    }));
+    if (settle != null && !motion.orbiting && !motion.moving) {
+      report.ok = false;
+      report.shots.push({
+        shot: name, level, settle, motion, ok: false,
+        error: `declared settle ${frames} but nothing was in motion at the shutter`,
+      });
+      continue; // the `finally` below closes the page
+    }
 
     await page.screenshot({ path: `${OUTDIR}/${name}.png`, type: 'png' });
     const info = await page.evaluate('window.__RENDER_INFO__ ?? null');
-    report.shots.push({ shot: name, level, ok: !applied?.error, info, logs: logs.filter((l) => /pageerror|\[error\]/.test(l)) });
+    report.shots.push({ shot: name, level, settle, motion, ok: !applied?.error, info, logs: logs.filter((l) => /pageerror|\[error\]/.test(l)) });
     if (applied?.error) report.ok = false;
   } catch (e) {
     report.ok = false;
-    report.shots.push({ shot: name, level, ok: false, error: e.message });
+    report.shots.push({ shot: name, level, settle, ok: false, error: e.message });
   } finally {
     await page.close();
   }

@@ -6,6 +6,26 @@
  * time. Everything time-varying is advanced afterwards by an exact number of
  * pumped frames, so the shutter always lands on the same frame index.
  *
+ * MOTION SHOTS — the one exception, and why it is not a loophole.
+ *
+ * The no-animation rule above is about LEGIBILITY, not determinism. Motion under
+ * lockstep is perfectly reproducible: the page runs no frame loop, so a shot that
+ * starts an animation and is then pumped a fixed number of frames lands on the
+ * same frame index on every run and every machine. What such a shot loses is that
+ * it no longer describes a STATE — it describes a state plus a frame count.
+ *
+ * So a shot MAY start an animation if it declares the `settle` it needs, which
+ * makes that frame count part of what the shot describes rather than an accident
+ * of the harness default:
+ *
+ *     orbitmid: Object.assign(fn, { settle: 14 })
+ *
+ * tools/baseline.mjs then pumps that many frames instead of its default, and
+ * REFUSES any shot that declared a settle and is not actually in motion at the
+ * shutter. That refusal is the load-bearing part: a motion shot that quietly
+ * landed on a settled frame would be perfectly reproducible, pass the gate
+ * forever, and cover nothing at all.
+ *
  * Each shot is a separate page load in the gate, so cost is linear in shot
  * count — but rotation states are cheap to cover and worth covering, since a
  * rotation regression is invisible in the default view.
