@@ -62,7 +62,25 @@ export default {
 
     this.level.cells.forEach((cell, i) => {
       const [x, y, z] = rotateY(cell, this.turns);
-      m.makeTranslation(x * CELL, y * CELL, z * CELL);
+      // ROTATE, then translate — not translate alone.
+      //
+      // The cube's silhouette is unchanged by a 90-degree turn about Y, so this
+      // looks like a no-op. It is not: paintByNormal bakes face tone onto
+      // WORLD-space normals, so a translation-only matrix leaves those normals
+      // pointing the same way and the tone stays keyed to the screen, while a
+      // camera orbit carries tone around with the geometry. The two disagreed,
+      // and the disagreement surfaced as a colour swap on the last frame of
+      // every rotation - measured at 3.1891% of pixels, maxDelta 48, where 48
+      // is exactly |faceLeft.r - faceRight.r| = |0xd9 - 0xa9|.
+      //
+      // Composing the rotation makes a world turn a true rigid rotation, so the
+      // turn and the orbit are the same transform and the commit frame is
+      // pixel-identical to the frame before it. Convention: LIGHT FIXED IN THE
+      // WORLD. Consequence, accepted deliberately: at odd rotations the two side
+      // tones are exchanged relative to turn 0, because you are genuinely
+      // looking at a different pair of faces.
+      m.makeRotationY(this.turns * Math.PI / 2);
+      m.setPosition(x * CELL, y * CELL, z * CELL);
       this.mesh.setMatrixAt(i, m);
 
       const id = cellId(...cell);
