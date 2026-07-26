@@ -118,6 +118,32 @@ The single most useful measurement is that the visual judgement and the routing
 depth agree. `+x×6 +y×4 -x×2 +z×4` was judged impossible on sight, and it is also
 the deepest-routing figure in the pool.
 
+### 3.1 The validated set
+
+Nine augmented candidates at `minTurns` 6 were rendered and judged. **Five held
+up; four collapsed into ordinary slabs.** The survivors, as leg sequences with
+their spur:
+
+| | figure | spur | cells | turns | walks |
+|---|---|---|---|---|---|
+| 1 | `-x×2 +z×4 +x×6 +y×4` | `+y×2` from `-2,0,1` | 19 | 6 | 8 |
+| 2 | `-z×2 +x×4 +z×6 +y×4` | `+y×2` from `1,0,-2` | 19 | 6 | 8 |
+| 4 | `-x×2 +z×3 +x×5 +y×3` | `+y×2` from `-2,0,1` | 16 | 6 | 6 |
+| 7 | `-z×2 +x×3 +z×5 +y×3` | `+y×2` from `1,0,-2` | 16 | 6 | 6 |
+| 8 | `+x×3 -y×2 +z×3 +y×5` | `-x×2` from `3,0,3` | 16 | 6 | 5 |
+
+Rows 1/2 and 4/7 are mirror pairs, so this is **three distinct figures**, not
+five. Row 1 is a cyclic rotation of the `+x×6 +y×4 -x×2 +z×4` judged above — the
+same figure entered from a different leg.
+
+Rows 3, 5, 6 and 9 of that render are recorded as rejected so nobody re-derives
+them: `-x×2 +z×2 +x×4 +y×2`, `+z×6 +y×2 -z×4 +x×2`, `-z×2 +x×2 +z×4 +y×2` and
+`+z×5 +y×2 -z×3 +x×2`, each with the spur listed above, all read as blocks.
+
+**The figures for `minTurns` 4 and 5 have not been selected.** Only the 6-turn set
+has been rendered and judged. That selection is the plan's first task, using the
+same pipeline, and §5 states what happens if it fails.
+
 ## 4. Playability, measured before any level is written
 
 A figure that reads as impossible is worthless if it cannot host a route where
@@ -157,6 +183,37 @@ Each level declares `{ turn, illusion, minWalks, minTurns, openWithWalk }` and
 `tools/analyze.mjs` proves it, exactly as the existing five do. CI already
 iterates every key in `LEVELS`, so new levels are covered without a workflow
 change.
+
+### 5.1 `minTurns` must be declared at the measured value, not merely bounded
+
+`levels.test.js:28` asserts `turnsInRoute >= minTurns`, so a level whose route
+takes six turns would pass a `minTurns: 4` declaration. Declaring a slack bound
+would make the campaign curve meaningless while keeping every test green — the
+exact silent-drift failure the premise system was built to close.
+
+So the declaration states the **measured** `turnsInRoute` for the chosen
+start/goal pair, matching what the shipping levels already do (`spur-01` declares
+1 and routes in 1; `shelf-03` declares 3 and routes in 3). Hitting a target of 4
+means selecting a start/goal pair that routes in exactly 4 — not declaring 4 on a
+figure that routes in 6.
+
+### 5.2 If a target cannot be met
+
+The 6-turn set is validated; 4 and 5 are not. If the pipeline yields no figure at
+one of those targets that survives visual judgement, the fallback in order of
+preference is:
+
+1. **Re-target the curve.** Ship the levels that do survive at whatever measured
+   values they have, provided the sequence stays non-decreasing — 4/6/6 or 5/6/6
+   is a worse curve than 4/5/6 but a real one.
+2. **Ship two levels instead of three.** Two new levels on a genuinely second
+   figure family still ends the one-figure-campaign problem.
+3. **Widen the search** — leg lengths beyond 6, or spurs beyond 3 cells — and
+   re-run the pipeline before relaxing anything else.
+
+What is **not** acceptable: declaring a slack `minTurns` to manufacture a curve,
+or shipping a figure that failed visual judgement because the numbers were good.
+Both were available to the previous phase and both would have passed CI.
 
 Level naming follows the existing convention, where the name describes the
 augmentation (`spur` detached, `span` detached, `shelf` integrated) and the number
