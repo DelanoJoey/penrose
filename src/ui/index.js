@@ -138,6 +138,11 @@ const KEY_ACTIONS = {
   BracketRight: { rotate: -1 },
   '[':          { rotate: +1 },
   ']':          { rotate: -1 },
+
+  // restart — reload the current level, keeping campaign position
+  KeyR:         { restart: true },
+  r:            { restart: true },
+  R:            { restart: true },
 };
 
 /**
@@ -312,6 +317,41 @@ function stylesheet(PALETTE) {
   text-transform: uppercase;
   color: ${rgba(PALETTE?.faceLeft, 0.62, 0xd98e73)};
 }
+/**
+ * A movement key that currently does nothing is dimmed, not hidden. Hiding it
+ * would say the key does not exist; dimming says it exists and is not wired to
+ * anything from here, which is the true statement and the one that teaches the
+ * mechanic.
+ */
+/*
+ * NO TRANSITION, AND NO BACKTICKS IN THIS COMMENT.
+ *
+ * A fade here would be a wall-clock animation, so a HUD-bearing capture would
+ * depend on when the shutter landed relative to the state change rather than on
+ * the frame index — exactly the nondeterminism config.hud promised not to
+ * introduce. test/ui.test.js bans the transition property outright and caught
+ * it the moment it was written.
+ *
+ * This whole stylesheet is a JS template literal, so a backtick anywhere in it
+ * ends the string. The first draft of this comment quoted two identifiers in
+ * backticks and broke the module at parse time — which also silently invalidated
+ * a round of mutation testing, because every run was failing on the syntax error
+ * rather than on the guard under test.
+ */
+#hud .keys b.k {
+  opacity: 0.28;
+}
+
+#hud .keys b.k.on {
+  opacity: 1;
+}
+
+#hud .keys .hint {
+  opacity: 0.75;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
 #hud .keys b {
   margin-right: 7px;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
@@ -437,7 +477,44 @@ export default {
       item.append(el('b', null, combo), document.createTextNode(what));
       return item;
     };
-    keys.append(legend('↑ ← ↓ →', 'Move'), legend('Q E', 'Rotate'));
+
+    /**
+     * THE LEGEND IS LIVE. Each arrow is its own element so it can be lit or
+     * dimmed by whether it currently does anything.
+     *
+     * MEASURED, over every cell of every level at all four rotations: the mean
+     * number of legal moves is 1.56 of 4, so **2.44 of the four movement keys
+     * do nothing at any given moment**. 43% of positions have at most one way
+     * out, and four positions in the campaign have NONE — there the only legal
+     * input is a rotation.
+     *
+     * None of that was visible. `player/blocked` is emitted, and src/audio is
+     * its only subscriber, so a dead key made a sound and changed no pixels.
+     * The player pressing four arrows and getting one response has no way to
+     * tell a wall from a bug, and described the result as bouncing around.
+     *
+     * This does not solve the puzzle for anyone: which cells are reachable is
+     * not the question a level asks. Which of my four keys is currently wired
+     * to anything is not a puzzle at all, and answering it turns a blind search
+     * into a legible one.
+     */
+    this.arrows = [
+      { el: el('b', 'k', '↑'), dir: SCREEN_DIR.upRight },
+      { el: el('b', 'k', '←'), dir: SCREEN_DIR.upLeft },
+      { el: el('b', 'k', '↓'), dir: SCREEN_DIR.downLeft },
+      { el: el('b', 'k', '→'), dir: SCREEN_DIR.downRight },
+    ];
+    const moveItem = el('div');
+    for (const a of this.arrows) moveItem.append(a.el);
+    moveItem.append(document.createTextNode('Move'));
+
+    /** Shown only when no movement key does anything, i.e. rotation is forced. */
+    this.elRotateHint = el('span', 'hint', ' — nothing to walk to, rotate');
+    this.elRotateHint.hidden = true;
+    const rotateItem = legend('Q E', 'Rotate');
+    rotateItem.append(this.elRotateHint);
+
+    keys.append(moveItem, rotateItem, legend('R', 'Restart level'));
 
     this.root.append(panel, keys);
 
@@ -446,7 +523,12 @@ export default {
      * produce, so the first update() writes every field exactly once and every
      * update after that writes only what actually moved.
      */
-    this.shown = { level: null, moves: -1, turns: -1, solved: null, progress: null, complete: null };
+    this.shown = {
+      level: null, moves: -1, turns: -1, solved: null, progress: null, complete: null,
+      // A string key for the set of currently-legal directions, so the DOM is
+      // written only when the set actually changes rather than every frame.
+      legal: null,
+    };
 
     if (this.inputEnabled) {
       this._onKeyDown = (event) => this._handleKey(event);
@@ -484,6 +566,23 @@ export default {
     }
     if (action.rotate) {
       this.ctx.emit('world/rotate-request', { delta: action.rotate });
+      return;
+    }
+    if (action.restart) {
+      /**
+       * There was no way out of a bad position except reloading the page.
+       *
+       * Four positions in the campaign have zero legal moves, and while a
+       * rotation always recovers them, a player who has not worked that out is
+       * stuck with no stated escape. Reloading also loses campaign progress,
+       * which turns a small confusion into a large one.
+       *
+       * Routed through the same `level/load-request` src/campaign uses, rather
+       * than reaching into world.loadLevel — the asker decides WHEN, the owner
+       * decides HOW (ARCHITECTURE.md §3.3).
+       */
+      const name = this.ctx.peek('world')?.level?.name;
+      if (name) this.ctx.emit('level/load-request', name);
     }
   },
 
@@ -552,6 +651,32 @@ export default {
       this.elSolved.hidden = !(solved || complete);
       shown.solved = solved;
       shown.complete = complete;
+    }
+
+    /**
+     * Light the movement keys that currently do something.
+     *
+     * Read through peek like everything else here. `available()` is the PLAYER's
+     * own answer — the same `_resolve` a keypress runs — so the legend cannot
+     * drift from what the keys actually do, which a reimplementation here
+     * eventually would.
+     *
+     * Guarded on `solved` too: once the level is won the keys still work, and
+     * showing them lit invites more input at the moment the player should be
+     * reading "Solved".
+     */
+    const legal = (player?.available?.() ?? []).map(([a, b]) => `${a},${b}`);
+    const legalKey = legal.slice().sort().join(' ');
+    if (legalKey !== shown.legal) {
+      for (const arrow of this.arrows) {
+        const on = arrow.dir && legal.includes(`${arrow.dir[0]},${arrow.dir[1]}`);
+        arrow.el.className = on ? 'k on' : 'k';
+      }
+      // Four dark arrows is a legal and reachable state — four cells in the
+      // campaign have no move at all — and it is indistinguishable from a
+      // broken keyboard unless something says so.
+      this.elRotateHint.hidden = legal.length > 0;
+      shown.legal = legalKey;
     }
   },
 

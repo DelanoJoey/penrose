@@ -75,13 +75,33 @@ test('unmapped and non-string keys resolve to null', () => {
 });
 
 test('no action is a hole — every entry does exactly one thing', () => {
+  /**
+   * Counted against the KNOWN VOCABULARY rather than asserted as
+   * `moves !== rotates`, which was a two-action exclusive-or and therefore
+   * rejected a third verb outright: `restart` set neither flag, so it read as a
+   * hole and failed. The exclusive-or also could not have grown — every new
+   * action would have had to be special-cased into the same boolean.
+   *
+   * Counting keeps both halves of the original claim (nothing does two things,
+   * nothing does none) and adds one it could not express: nothing carries a
+   * field this test has never heard of, which is how an action silently
+   * acquires a second meaning.
+   */
+  const VERBS = ['move', 'rotate', 'restart'];
   for (const [key, action] of Object.entries(KEY_ACTIONS)) {
-    const moves = action.move != null;
-    const rotates = action.rotate != null;
-    assert.ok(moves !== rotates, `${key} must either move or rotate, not both/neither`);
-    if (moves) assert.equal(action.move.length, 2, `${key} move is not a screen delta`);
-    if (rotates) assert.ok(action.rotate === 1 || action.rotate === -1,
+    const set = VERBS.filter((v) => action[v] != null);
+    assert.equal(set.length, 1,
+      `${key} must do exactly one of ${VERBS.join('/')}, it does ${set.length}: ${JSON.stringify(action)}`);
+
+    const unknown = Object.keys(action).filter((k) => !VERBS.includes(k));
+    assert.deepEqual(unknown, [],
+      `${key} carries unknown action field(s) ${unknown.join(', ')} — add the verb to VERBS here ` +
+      'and to _handleKey, or the key silently does nothing');
+
+    if (action.move != null) assert.equal(action.move.length, 2, `${key} move is not a screen delta`);
+    if (action.rotate != null) assert.ok(action.rotate === 1 || action.rotate === -1,
       `${key} rotate must be a single quarter turn`);
+    if (action.restart != null) assert.equal(action.restart, true, `${key} restart must be true`);
   }
 });
 
