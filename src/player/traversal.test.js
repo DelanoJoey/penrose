@@ -256,7 +256,8 @@ test('state() is discrete: advancing time changes nothing in it', async () => {
   await boot();
   player.step(SCREEN_DELTA['+x']);
   const before = player.state();
-  assert.deepEqual(Object.keys(before).sort(), ['cell', 'level', 'moves', 'solved']);
+  assert.deepEqual(Object.keys(before).sort(),
+    ['budget', 'cell', 'failed', 'level', 'moves', 'par', 'solved']);
   for (let i = 0; i < 120; i++) player.update({ time: { dt: FRAME } });
   assert.deepEqual(player.state(), before);
   assert.equal(before.cell, '2,0,0', 'the logical cell commits at step(), not at arrival');
@@ -270,7 +271,10 @@ test('stepping before a level loads is a no-op, not a throw', async () => {
   assert.equal(player.step(SCREEN_DELTA['+x']), false);
   assert.deepEqual(player.available(), []);
   assert.equal(h.events.length, 0);
-  assert.deepEqual(player.state(), { cell: null, moves: 0, solved: false, level: null });
+  // budget and par are null with no level: a level that has not loaded has no
+  // par to measure against, and inventing one would be a guess the HUD renders.
+  assert.deepEqual(player.state(),
+    { cell: null, moves: 0, solved: false, failed: false, par: null, budget: null, level: null });
 });
 
 test('malformed directions are rejected without moving', async () => {

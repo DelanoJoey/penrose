@@ -39,6 +39,15 @@
 /** Frames between solving a level and the next one loading. 0.8 s at 1/60. */
 const ADVANCE_FRAMES = 48;
 
+/**
+ * Frames between running out of moves and the level reloading. 1.2 s at 1/60.
+ *
+ * Longer than ADVANCE_FRAMES on purpose: "Solved" confirms something the player
+ * already knows they did, and "Out of moves" is news. The extra 0.4 s is time to
+ * read it before the board resets under them.
+ */
+const RETRY_FRAMES = 72;
+
 export default {
   name: 'campaign',
 
@@ -49,6 +58,16 @@ export default {
     this.index = 0;
     this.complete = false;
     this._pending = 0;
+    /**
+     * What the countdown is counting down TO: 'advance' or 'retry'.
+     *
+     * One scheduler with an action rather than two counters, because two could
+     * both be armed and the order they fired in would decide whether a level
+     * advanced or reloaded. Solved and failed are already mutually exclusive in
+     * src/player, so this is belt and braces — but the failure it prevents is
+     * the campaign silently skipping a level, which no test would read as wrong.
+     */
+    this._action = null;
 
     // Seed from world if it has ALREADY loaded, so registration order is not
     // load-bearing. main.js adds this subsystem before world so the event below
@@ -60,11 +79,26 @@ export default {
     ctx.on('level/loaded', (level) => {
       this._sync(level?.name);
       this._pending = 0;
+      this._action = null;
     });
 
     ctx.on('level/solved', () => {
       if (!this.enabled || this.complete || this._pending > 0) return;
       this._pending = ADVANCE_FRAMES;
+      this._action = 'advance';
+    });
+
+    /**
+     * Out of moves — reload the SAME level rather than advancing.
+     *
+     * Not `this.complete`-guarded, unlike solved: finishing the run means there
+     * is no next level to advance to, but a level can still be failed and
+     * retried afterwards. Guarding on it would make the last level unloseable.
+     */
+    ctx.on('level/failed', () => {
+      if (!this.enabled || this._pending > 0) return;
+      this._pending = RETRY_FRAMES;
+      this._action = 'retry';
     });
   },
 
@@ -96,7 +130,16 @@ export default {
     this._pending -= 1;
     if (this._pending > 0) return;
 
+    const action = this._action;
+    this._action = null;
     const order = this._order();
+
+    if (action === 'retry') {
+      const again = order[this.index] ?? ctx.peek?.('world')?.level?.name;
+      if (again) ctx.emit('level/load-request', { name: again });
+      return;
+    }
+
     const next = order[this.index + 1];
     if (next) {
       ctx.emit('level/load-request', { name: next });
@@ -108,5 +151,6 @@ export default {
 
   dispose() {
     this._pending = 0;
+    this._action = null;
   },
 };

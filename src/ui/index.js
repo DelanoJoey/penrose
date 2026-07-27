@@ -304,6 +304,17 @@ function stylesheet(PALETTE) {
   text-transform: uppercase;
   color: ${accent};
 }
+/* Lost, not won. Same slot and metrics, the warm ink instead of the accent, so
+   the two outcomes are told apart by colour rather than by position. No
+   transition and no keyframes: src/ui may contain no clock (ARCHITECTURE §5). */
+#hud .solved.lost {
+  border-top-color: ${rgba(PALETTE?.faceRight, 0.5, 0xe4573f)};
+  color: ${rgba(PALETTE?.faceRight, 0.95, 0xe4573f)};
+}
+/* The budget, trailing the move count. Dimmed, because par is the number the
+   player is aiming at and the total is only context for it. */
+#hud .budget { opacity: 0.55; }
+#hud .budget.low { opacity: 1; color: ${rgba(PALETTE?.faceRight, 0.95, 0xe4573f)}; }
 
 #hud .keys {
   position: absolute;
@@ -447,10 +458,21 @@ export default {
     const objective = el('div', 'objective', 'Walk the green pawn to the green ring');
     panel.append(this.elLevel, this.elProgress, objective, el('div', 'rule'));
 
+    /**
+     * Moves, against what the level allows — "3 / 17 · par 7".
+     *
+     * The count used to be unbounded, which said nothing: a player with no idea
+     * whether 31 moves was good, bad or impossible had no reason to try again.
+     * Two numbers fix that. The BUDGET is the lose condition and the PAR is the
+     * target, and they are different on purpose — par is reachable and the
+     * budget is generous, so the number to beat is not the number that kills you.
+     */
     const movesRow = el('div', 'row');
     this.elMoves = el('span', null, '0');
+    this.elBudget = el('span', 'budget', '');
+    this.elPar = el('span', 'budget', '');
     const movesValue = el('div', 'value');
-    movesValue.append(this.elMoves);
+    movesValue.append(this.elMoves, this.elBudget, this.elPar);
     movesRow.append(el('div', 'label', 'Moves'), movesValue);
 
     const viewRow = el('div', 'row');
@@ -525,6 +547,7 @@ export default {
      */
     this.shown = {
       level: null, moves: -1, turns: -1, solved: null, progress: null, complete: null,
+      budget: undefined, par: undefined, failed: null,
       // A string key for the set of currently-legal directions, so the DOM is
       // written only when the set actually changes rather than every frame.
       legal: null,
@@ -609,6 +632,9 @@ export default {
     const level = state?.level ?? world?.level?.name ?? '—';
     const moves = state?.moves ?? 0;
     const solved = state?.solved === true;
+    const failed = state?.failed === true;
+    const budget = state?.budget ?? null;
+    const par = state?.par ?? null;
     // Integer check, not `?? 0`: a NaN rotation would index this.pips[NaN] and
     // throw on every frame for the rest of the run.
     const raw = world?.turns;
@@ -621,9 +647,20 @@ export default {
       shown.level = level;
     }
 
-    if (moves !== shown.moves) {
+    if (moves !== shown.moves || budget !== shown.budget) {
       this.elMoves.textContent = String(moves);
+      this.elBudget.textContent = budget === null ? '' : ` / ${budget}`;
+      // Warn inside the last four walks. A threshold rather than a countdown
+      // element: one class flip, no extra DOM, and nothing time-derived.
+      this.elBudget.className =
+        budget !== null && budget - moves <= 4 ? 'budget low' : 'budget';
       shown.moves = moves;
+      shown.budget = budget;
+    }
+
+    if (par !== shown.par) {
+      this.elPar.textContent = par === null ? '' : ` · par ${par}`;
+      shown.par = par;
     }
 
     if (turns !== shown.turns) {
@@ -646,11 +683,18 @@ export default {
       shown.progress = progress;
     }
 
-    if (solved !== shown.solved || complete !== shown.complete) {
-      this.elSolved.textContent = complete ? 'All levels complete' : 'Solved';
-      this.elSolved.hidden = !(solved || complete);
+    if (solved !== shown.solved || complete !== shown.complete || failed !== shown.failed) {
+      // `complete` outranks `solved` outranks `failed`, and the player cannot be
+      // solved and failed at once — src/player gates the fail check on !solved,
+      // so a last walk that lands on the goal wins rather than starving.
+      this.elSolved.textContent = complete ? 'All levels complete'
+        : solved ? 'Solved'
+        : 'Out of moves — retrying';
+      this.elSolved.className = failed && !solved && !complete ? 'solved lost' : 'solved';
+      this.elSolved.hidden = !(solved || complete || failed);
       shown.solved = solved;
       shown.complete = complete;
+      shown.failed = failed;
     }
 
     /**
