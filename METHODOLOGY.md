@@ -1900,6 +1900,78 @@ it. 197 tests pass.
 
 ---
 
+## P16 — the playthrough, and the constants were not the cost
+
+**Completed 2026-07-27.** P11 tried to answer "does `crook-06` drag" by driving
+the real build in a browser and got `document.hidden: true` with **0 frames per
+second** — Chrome throttles rAF in a background tab. The cell still advanced,
+because `step()` resolves its target immediately, so it *looked* like play while
+the clock was stopped. Pacing was the whole question, so it measured nothing.
+
+`tools/playthrough.mjs` routes around it. Lockstep has no frame loop at all —
+state advances only inside `__PUMP__` (`src/main.js`) — so the throttle cannot
+apply. Every frame is asked for explicitly.
+
+Moves are driven through the same subsystem entry points a keypress reaches:
+`player.step` for a walk (after asking the PLAYER which screen direction resolves
+to the target, rather than deciding that here) and `world/rotate-request` for a
+turn. Frame counts are **polled**, one pump at a time until the engine reports
+the motion over — never a fixed count — so the timeline stays a measurement if
+the timing constants ever move.
+
+### `crook-06`, measured end to end
+
+```
+move  kind   frames  atFrame   cell      turns
+   0  walk       14       14   1,0,3         0
+   1  turn       28       42   1,0,3         1
+   2  walk       14       56   3,-2,2        1
+   3  turn       28       84   3,-2,2        2
+   4  turn       28      112   3,-2,2        3     <-- two turns back to back
+   5  walk       14      126   3,-2,1        3
+   6  turn       28      154   3,-2,1        2
+   7  walk       14      168   1,0,0         2
+   8  turn       28      196   1,0,0         3
+   9  turn       28      224   1,0,0         0     <-- and again
+  10  walk       14      238   3,3,3         0     solved
+```
+
+**238 frames, 3.97 s. 168 of them — 70.6% — are camera-only.** Across the
+campaign: `loop-01` 0%, `spur-01` 22.2%, `crook-06` 70.6%, tracking P11's
+computed table (0 / 22.6 / 71.1) closely enough to confirm it.
+
+### The correction: the constants are not the cost
+
+P11 computed a turn at 0.45 s and a walk at 0.22 s, ratio **2.05x**. The engine
+does not charge those. Measured, a walk takes **14 frames** and a turn **28** —
+0.2333 s and 0.4667 s — and the true ratio is **exactly 2.0x**.
+
+`test/motion-frames.test.js` already carried the warning, in bold, about this
+precise trap: *"ceil(ORBIT_SECONDS / fixedDt) is 27, and the real engine commits
+at 28 … Measure, do not compute."* P11 computed. The conclusion survives the
+correction, which is luck rather than method.
+
+### What it actually shows
+
+Twice — moves 3–4 and moves 8–9 — the route takes **two turns back to back: 56
+consecutive frames, 0.93 s, in which nothing happens but the camera swinging and
+the player can do nothing that matters.** `step()` is not refused mid-orbit, but
+it resolves against the pre-commit rotation, so any input during those 56 frames
+answers a question about the arrangement being rotated away from.
+
+That is the concrete form of the complaint, and it is now a thing that can be
+looked at rather than inferred. **It is still not a verdict on whether it is
+tedious** — that needs a person. But the artifact exists, it is reproducible, and
+it is 0.93 seconds of dead air, twice, in an 11-input level.
+
+### Still open
+
+- Whether that is actually unpleasant. A human, or a foregrounded window.
+- P15's `perch-05` design call; persistence; an ending; `_emit`'s try/catch;
+  P14's finding that absolute panel scores are properties of their judge.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
