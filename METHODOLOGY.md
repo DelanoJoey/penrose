@@ -2052,6 +2052,64 @@ level kit was given one (`level-kit`) to make that possible — it had none, unl
 
 198 tests pass. `npm run gate` PASSES.
 
+### Then they played the fixed build and still could not do anything
+
+> *I dont know, I cant do anything but bounce around.*
+
+The marker and the objective line were not the whole problem. Measured across
+every cell of every level at all four rotations:
+
+```
+mean legal moves            1.56 of 4    -> 2.44 keys do NOTHING, silently
+positions with <= 1 way out       43%
+positions with ZERO legal moves     4    -> only a rotation is legal there
+positions with 3+ options           2    of 321
+```
+
+**Roughly three fifths of every keypress is a silent no-op.** `player/blocked`
+is emitted and `src/audio` is its ONLY subscriber, so a dead key made a sound
+and changed no pixels. There was also no restart, no undo, and no way out of a
+bad position except reloading the page — which loses campaign progress.
+
+"Bouncing around" is not a complaint about the game being hard. It is an exact
+description of walking a graph with a mean degree of 1.56 while blindfolded.
+
+- **The key legend is now live.** Each arrow lights only while it does
+  something, read from the player's own `available()` — the same `_resolve` a
+  keypress runs, so the legend cannot drift from the keys. Verified against the
+  real DOM at three states: 2 legal moves lights 2 arrows, 1 lights 1, and 0
+  lights none.
+- **Zero legal moves says so**: *"nothing to walk to, rotate"*. Four dark arrows
+  is a legal, reachable state and is otherwise indistinguishable from a broken
+  keyboard.
+- **R restarts the level**, through the same `level/load-request` src/campaign
+  uses.
+
+This does not solve any puzzle. Which cells are reachable is not the question a
+level asks; which of my four keys is currently wired to anything is not a puzzle
+at all.
+
+### Two guards caught two real defects, in one commit
+
+**A CSS transition on the arrow dimming.** `test/ui.test.js` bans `transition:`
+outright, and it is right to: a fade is a wall-clock animation, so a HUD-bearing
+capture would depend on when the shutter landed relative to the state change
+rather than on the frame index — precisely the nondeterminism `config.hud`
+promised not to introduce two phases ago.
+
+**A key that did neither of the two known things.** `no action is a hole`
+asserted `moves !== rotates`, a two-verb exclusive-or that rejected `restart` as
+a hole. Rewritten to count against a known vocabulary, which keeps both halves
+of the original claim and adds one it could not express: an action carrying a
+field the test has never heard of now fails, because that is how a key silently
+acquires a second meaning.
+
+**And one round of mutation testing was invalid and had to be redone.** A comment
+inside the stylesheet — a JS template literal — quoted two identifiers in
+backticks, which ended the string and broke the module at parse time. Every
+mutation in that round "failed" on the syntax error rather than on the guard
+under test. The re-run added a parse check before each mutation.
+
 ### The lesson, which is not new here
 
 This project has built a pixel gate, a determinism gate, an adversarial pairwise
