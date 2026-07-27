@@ -1972,6 +1972,99 @@ it is 0.93 seconds of dead air, twice, in an 11-input level.
 
 ---
 
+## P17 — someone played it and could not find the game
+
+**Completed 2026-07-27.** Five moves into level 3 of 7, with the HUD on screen,
+the person who commissioned this project asked three questions:
+
+> *I can move with arrows, is this a puzzle game? I can spin the figure, but what
+> is the point of the game? what is the green thing that jumps around?*
+
+Not one of those is answerable from the screen. They were all correct questions.
+
+### What was actually true
+
+- **The game never states its objective.** Searching `src/ui` for *goal*,
+  *objective*, *target* or *reach* returned nothing; the word appears once, in an
+  unrelated comment. The HUD showed the level name, `3/7`, a move count and
+  rotation pips — none of which is "get the pawn to the marked tile".
+- **The goal was marked by a 1.5x ink-density lift and nothing else.** No shape,
+  no outline, no label. A slightly paler tile.
+- **Start and goal were rendered IDENTICALLY** (`_applyRotation`, one expression
+  applying `INK.knockout` to both). Two pale tiles, nothing to say which was
+  which. That is a defect, not a gap.
+
+### Why nothing caught it
+
+`communication` has been the lowest-scoring lens in every panel this project has
+run — 4.3 at P9, 3.28 HUD-free at P11 — and **not one of them located this.**
+A lens returns a score; a player returns a question. P11 even measured the HUD
+lifting `communication` by +2.61, the largest single effect in this document, and
+concluded the HUD was doing its job. **The HUD was on.** It moved the number
+without touching the problem.
+
+And several judges called the split figure "broken or missing geometry". P14
+recorded that as judges failing to resolve the stimulus. **They were reading it
+exactly as the player did.** That attribution was wrong and is corrected here.
+
+### The fix
+
+- **The start marker is gone.** The avatar stands on it; a second identical pale
+  tile only competed with the real one. One knockout now means one thing.
+- **A goal marker**, a flat green ring on the goal cell's floor. Green because
+  that is already the avatar's ink, so the reading needs no legend: *green solid
+  is you, green outline is where you go*. Shape is the one channel this art
+  direction leaves free — the palette is fixed and `INK.knockout`'s docstring
+  already proves a hue shift cannot work through a multiply-only channel.
+- **One line in the HUD**: *"Walk the green pawn to the green ring."* Sentence
+  case and tighter tracking than the all-caps chrome around it, because that
+  chrome is exactly what the eye learns to skip.
+
+Cost: draw calls 3 -> 4, **programs 3 -> 3**, +8 triangles. The marker reuses the
+`InstancedMesh` + `instanceColor` + `MeshBasicMaterial{vertexColors}` parameter
+set the level kit and the avatar already share, so three.js returns the cached
+program instead of compiling a second one.
+
+### It shipped invisible the first time
+
+Placed at the goal cell's plain `y`, the ring rendered at `y - 0.5` — the BOTTOM
+face of a solid block, buried inside it. **It drew nothing at all while the HUD
+confidently instructed the player to walk to a green ring.** All 197 tests stayed
+green. It was caught by opening the capture and seeing no ring.
+
+A cell is a solid block and an occupant sits a cell above it — `_restPosition`
+returns `y + 1` and offsets its geometry to `-0.5`, landing feet on the top face.
+The marker now matches that exactly, which also keeps it under the pawn when the
+pawn arrives rather than nearly under it.
+
+### Guards
+
+`loadlevel.test.js` now asserts the marker tracks all four rotations, including
+the `+ 1`. Falsified twice — plain `y`, and a marker frozen at rotation 0 — each
+failing the test that claims it.
+
+The leak guard there asserted `meshes.length === 1` and would have been "fixed"
+by changing the 1 to a 2. **That is satisfied by two level kits and no marker**,
+which is the exact leak it exists to catch, so it would have gone quiet at the
+moment it acquired a second thing to watch. It now asserts by NAME, and the
+level kit was given one (`level-kit`) to make that possible — it had none, unlike
+`avatar` and `paper`.
+
+198 tests pass. `npm run gate` PASSES.
+
+### The lesson, which is not new here
+
+This project has built a pixel gate, a determinism gate, an adversarial pairwise
+panel, a competence control, a four-model rubric panel, and a variance ladder
+decomposing every instrument it owns. **All of it missed the fact that a player
+could not tell what the game was.** Thirty seconds of somebody playing found it.
+
+Every significant defect in this document was caught by looking. This one was
+caught by someone else looking, which is the only version this project had not
+tried.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted

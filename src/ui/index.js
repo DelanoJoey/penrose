@@ -219,6 +219,21 @@ function stylesheet(PALETTE) {
   opacity: 0.55;
 }
 
+/**
+ * The objective line. Deliberately NOT the same treatment as the labels below
+ * it: those are 0.24em-tracked all-caps chrome that the eye learns to skip, and
+ * this is the one line that must be read once. Sentence case, tighter tracking,
+ * higher contrast than .progress.
+ */
+#hud .objective {
+  margin: -4px 0 14px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.9;
+  max-width: 22em;
+}
+
 #hud .level {
   margin: 0 0 12px;
   font-size: 15px;
@@ -376,7 +391,21 @@ export default {
     // Its OWN element, not a child of elLevel: update() writes elLevel.textContent,
     // which replaces all children and would silently delete a nested span.
     this.elProgress = el('div', 'progress', '');
-    panel.append(this.elLevel, this.elProgress, el('div', 'rule'));
+    /**
+     * THE GAME SAYS WHAT IT IS. It did not, anywhere.
+     *
+     * A player five moves into level 3 of 7, with this HUD on screen, asked
+     * what the point of the game was, where the goal was, and what the green
+     * thing was. Every panel since P9 scored `communication` lowest of five
+     * lenses and not one of them found this, because a lens returns a number
+     * and a player returns a question.
+     *
+     * One line, stated once, naming the avatar and the objective in the terms
+     * the screen already uses — green solid, green ring. It costs one element
+     * and no per-frame work: written at build, never touched by update().
+     */
+    const objective = el('div', 'objective', 'Walk the green pawn to the green ring');
+    panel.append(this.elLevel, this.elProgress, objective, el('div', 'rule'));
 
     const movesRow = el('div', 'row');
     this.elMoves = el('span', null, '0');

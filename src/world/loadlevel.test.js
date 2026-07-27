@@ -4,6 +4,7 @@ import * as THREE from 'three';
 
 import world from './index.js';
 import { LEVELS, DEFAULT_LEVEL } from './levels.js';
+import { rotateY } from '../geometry/index.js';
 
 /**
  * Runtime level switching.
@@ -80,13 +81,27 @@ test('loadLevel disposes the old mesh — a leak here grows on every level chang
   world.dispose();
 });
 
-test('the scene holds exactly one world mesh after repeated loads', async () => {
+test('the scene holds exactly one of each world mesh after repeated loads', async () => {
+  /**
+   * BY NAME, NOT BY COUNT. This asserted `length === 1` until the goal marker
+   * arrived and legitimately made it 2 — and the obvious repair, changing the 1
+   * to a 2, is satisfied just as happily by two level kits and no marker. That
+   * is the leak this test exists to catch, so it would have gone quiet at the
+   * exact moment it acquired a second thing to watch.
+   */
   const h = harness();
   await world.init(h.ctx);
   for (const n of ['spur-01', 'span-02', 'shelf-03', 'loop-01']) world.loadLevel(n);
 
   const meshes = h.scene.children.filter((c) => c.isInstancedMesh);
-  assert.equal(meshes.length, 1, `scene accumulated ${meshes.length} meshes`);
+  const byName = meshes.reduce((m, c) => m.set(c.name, (m.get(c.name) ?? 0) + 1), new Map());
+
+  assert.equal(byName.get('level-kit'), 1,
+    `scene holds ${byName.get('level-kit') ?? 0} level kits after 4 loads`);
+  assert.equal(byName.get('goal-marker'), 1,
+    `scene holds ${byName.get('goal-marker') ?? 0} goal markers after 4 loads`);
+  assert.equal(meshes.length, 2,
+    `scene holds an unexpected instanced mesh: ${meshes.map((c) => c.name || '(unnamed)').join(', ')}`);
   world.dispose();
 });
 
@@ -120,5 +135,40 @@ test('level/load-request drives it, accepting a name or a payload', async () => 
 
   h.ctx.emit('level/load-request', 'spur-01');
   assert.equal(world.level.name, 'spur-01');
+  world.dispose();
+});
+
+test('the goal marker follows the world through all four rotations', async () => {
+  /**
+   * The marker is a SEPARATE mesh from the level kit, so nothing about the kit's
+   * instance matrices carries it. Placed once at install it would sit at the
+   * unrotated goal and drift off its own cell the moment the player pressed Q —
+   * visible instantly in play, and invisible to every static shot in the set.
+   *
+   * The + 1 is the occupant convention, not a nudge: a cell is a solid block and
+   * whatever stands on it sits a cell higher (src/player `_restPosition`).
+   * Placed at plain y the first time, which buried the ring inside the block and
+   * rendered nothing while the HUD told the player to walk to it.
+   */
+  const h = harness();
+  await world.init(h.ctx);
+  world.loadLevel('span-02');
+
+  const marker = h.scene.children.find((c) => c.name === 'goal-marker');
+  assert.ok(marker, 'no goal marker in the scene');
+
+  const m = new THREE.Matrix4();
+  const p = new THREE.Vector3();
+  for (const turns of [0, 1, 2, 3]) {
+    world.setRotation(turns);
+    marker.getMatrixAt(0, m);
+    p.setFromMatrixPosition(m);
+    const [gx, gy, gz] = rotateY(world.level.goal, turns);
+    assert.equal(p.x, gx, `marker x wrong at turn ${turns}`);
+    assert.equal(p.z, gz, `marker z wrong at turn ${turns}`);
+    assert.equal(p.y, gy + 1,
+      `marker y is ${p.y} at turn ${turns}, expected ${gy + 1} — an occupant sits ON the block, ` +
+      'and at plain y the ring renders inside it and is never seen');
+  }
   world.dispose();
 });
