@@ -469,6 +469,85 @@ export class Structure {
   }
 
   /**
+   * How much CHOICE a level offers, which is not what any other measurement
+   * here reports.
+   *
+   * The campaign's difficulty curve is declared in turns and every level was
+   * selected on turns. Turn count says nothing about whether a position offers
+   * a decision: measured across all eight shipping levels, `crook-06` requires
+   * six turns and contains no fork at all, `arm-04` has par 12 and contains
+   * none, and the whole campaign holds ONE across 358 positions. Roughly half
+   * of the augmented pool has at least one. Nothing had ever computed it, so
+   * nothing had ever selected on it.
+   *
+   * A FORK is two neighbours that each STRICTLY reduce the remaining walks. It
+   * is deliberately not "neighbours whose costs differ", which also counts
+   * walking back the way you came and reports 173 of 358 for the same eight
+   * levels. A metric that counts corridors as decisions would aim level
+   * selection somewhere worse than turn count already does.
+   *
+   * COST COMES FROM ONE SEARCH, NOT ONE PER CELL. Turns are free -- the same
+   * decision, for the same reason, as in minWalksBetween -- so walking cost is
+   * rotation-independent and a single breadth-first search from the goal over
+   * the UNION of the four rotations' path graphs gives every cell's remaining
+   * walks. src/geometry/branching.test.js asserts that agrees with
+   * minWalksBetween on every campaign cell, because that is the one place this
+   * could silently disagree with the number the move budget rests on.
+   *
+   * @returns {{positions:number, forks:number, choices:number, maxDegree:number,
+   *            zeroMoves:number, costs:Map<string,number>}|null}
+   *          null if the goal is unreachable from the start.
+   */
+  branching(fromCell, toCell) {
+    const graphs = [0, 1, 2, 3].map((t) => this.pathGraph(t));
+
+    const adj = new Map();
+    for (const g of graphs) {
+      for (const [id, tos] of g) {
+        if (!adj.has(id)) adj.set(id, new Set());
+        for (const to of tos) adj.get(id).add(to);
+      }
+    }
+
+    const goal = cellId(...toCell);
+    const start = cellId(...fromCell);
+    if (!adj.has(goal) || !adj.has(start)) return null;
+
+    const costs = new Map([[goal, 0]]);
+    const queue = [goal];
+    for (let i = 0; i < queue.length; i++) {
+      const cur = queue[i];
+      const d = costs.get(cur);
+      for (const n of adj.get(cur) ?? []) {
+        if (!costs.has(n)) { costs.set(n, d + 1); queue.push(n); }
+      }
+    }
+    if (!costs.has(start)) return null;
+
+    let positions = 0, forks = 0, choices = 0, maxDegree = 0, zeroMoves = 0;
+    for (const g of graphs) {
+      for (const [id, tos] of g) {
+        positions += 1;
+        const uniq = [...new Set(tos)];
+        if (uniq.length > maxDegree) maxDegree = uniq.length;
+        if (uniq.length === 0) zeroMoves += 1;
+        if (uniq.length >= 2) choices += 1;
+
+        const here = costs.get(id);
+        if (here == null || uniq.length < 2) continue;
+        let better = 0;
+        for (const n of uniq) {
+          const c = costs.get(n);
+          if (c != null && c < here) better += 1;
+        }
+        if (better >= 2) forks += 1;
+      }
+    }
+
+    return { positions, forks, choices, maxDegree, zeroMoves, costs };
+  }
+
+  /**
    * Everything a level declares about itself, measured.
    *
    * `requiresTurn` is defined against turn 0 alone, because that is the state

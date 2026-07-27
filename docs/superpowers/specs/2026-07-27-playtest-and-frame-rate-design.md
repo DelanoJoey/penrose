@@ -422,7 +422,7 @@ own documented failure shape and is not worth re-learning.
 | `src/dev/trace.test.js` — reload | entries written under a second `frame` origin still order correctly by `seq` |
 | `src/geometry/branching.test.js` — fixtures | `Structure.branching()` on hand-checked shapes: a corridor has 0 forks, a diamond has 1 |
 | `src/geometry/branching.test.js` — agreement | the union-graph cost used by `branching()` equals `minWalksBetween` for every standable cell of every campaign level. This is the one place the metric could silently disagree with the number the move budget rests on |
-| `test/true-minturns.test.js` — campaign | the campaign totals **1 fork across 358 positions**, so the number moves visibly when levels change |
+| `src/geometry/branching.test.js` — campaign | the campaign totals **1 fork across 358 positions**, so the number moves visibly when levels change. It lives here rather than in `true-minturns.test.js`, which is about declared-versus-measured `minTurns`; this is a geometry property, not a curve property |
 
 ## 7. Verification
 
