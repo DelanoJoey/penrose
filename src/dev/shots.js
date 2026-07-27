@@ -287,6 +287,36 @@ export function makeShots(ctx) {
     }, { settle: 27 }),
 
     /**
+     * The SAME sweep in the other direction, frame 14 of 28.
+     *
+     * Every orbit this project has ever captured is `delta: +1`. That left a set
+     * of negative-delta paths with no gated frame anywhere behind them:
+     *
+     *   - `CameraOrbit.angle` — `CAMERA_TURN_SIGN * this.delta * ...`, whose sign
+     *     only flips here (src/render:528);
+     *   - `_drain`'s `step = this._pending < 0 ? -1 : 1` and the matching
+     *     `this._pending -= step`, which is the only place a negative queue is
+     *     drained (src/render:1067);
+     *   - `_commit`'s `setRotation(orbit.fromTurns + orbit.delta)`, which relies
+     *     on setRotation normalising 0 + -1 to 3 rather than leaving it negative
+     *     (src/render:1056).
+     *
+     * Unit tests reach the arithmetic; nothing reached the PICTURE. A sign error
+     * in any of the three would swing the camera the wrong way, and every one of
+     * the 18 gated shots would have gone on passing.
+     *
+     * Framed on the union of turn 0 and turn 3, because that is where a -1 lands
+     * — using `rotated(1)` here would compose the wrong destination and quietly
+     * frame a state this shot never visits.
+     */
+    orbitback: Object.assign(() => {
+      compose(0, () => [...rotated(0), ...rotated(3)],
+        { fillY: 0.62, fillX: 0.74, liftY: 0.02 });
+      ctx.peek('player')?.placeAt('1,0,0');
+      ctx.emit('world/rotate-request', { delta: -1 });
+    }, { settle: 14 }),
+
+    /**
      * A step in flight, frame 7 of 14 — the top of the hop arc.
      *
      * Framed on the upper walkway like `avatarmid`, but the pawn is moving

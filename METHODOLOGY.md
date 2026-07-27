@@ -1675,6 +1675,55 @@ cancel; **no individual lens score in this document should be quoted alone.**
 
 ---
 
+## P13 — the orbit that had never been photographed
+
+**Completed 2026-07-27.** Small, and it closes a coverage hole open since P2.
+
+Every orbit this project has ever captured is `delta: +1`. Both motion shots
+request `+1`, so three negative-delta paths had no gated frame behind them:
+
+- `CameraOrbit.angle`, `CAMERA_TURN_SIGN * this.delta * ...` — the sign only
+  flips for a negative delta (`src/render/index.js:528`);
+- `_drain`'s `step = this._pending < 0 ? -1 : 1` and its matching
+  `this._pending -= step`, the only place a negative queue is drained (`:1067`);
+- `_commit`'s `setRotation(orbit.fromTurns + orbit.delta)`, which depends on
+  `setRotation` normalising `0 + -1` to `3` (`:1056`).
+
+Unit tests reach the arithmetic. **Nothing reached the picture.**
+
+`orbitback` is `orbitmid`'s sweep in the other direction, framed on the union of
+turn 0 and turn **3** — `rotated(1)` would have composed a destination the shot
+never visits.
+
+### The shot was falsified before it was trusted
+
+Replacing `this.delta` with `Math.abs(this.delta)` in `CameraOrbit.angle` makes a
+−1 orbit sweep the wrong way. Captured across the whole set:
+
+```
+MOVED:      orbitback.png   10.45% changed
+UNCHANGED:  all 18 pre-existing shots
+```
+
+One shot moved and eighteen did not, which is the exact statement that the gated
+set was blind to this and now is not. A sign error in any of the three paths would
+have swung the camera backwards and every previously gated frame would have gone
+on passing.
+
+19 gated shots. 192 tests pass. `npm run gate` PASSES.
+
+### Not done, and why
+
+`src/core/engine._emit` still has no try/catch — one throwing listener still
+aborts every listener after it. Left alone deliberately: the handoff records it as
+"declined in P4", and **no rationale for that decline is recorded anywhere in this
+document.** A deliberate decision whose reason was never written down is
+indistinguishable from an omission, and reversing it blind is how the reason gets
+rediscovered the expensive way. It needs whoever declined it, or a fresh argument
+made on the merits.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
