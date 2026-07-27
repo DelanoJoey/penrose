@@ -98,7 +98,7 @@ export function makeShots(ctx) {
   /** The whole structure at `turns`, composed as a poster plate. */
   const plate = (turns, opts) => () => compose(turns, () => rotated(turns), opts);
 
-  return {
+  const shots = {
     /**
      * The read the whole level is designed around. The loop closes here.
      * Filled to 78% of frame height — large enough that the tribar is the
@@ -331,5 +331,42 @@ export function makeShots(ctx) {
         { fillY: 0.64, fillX: 0.72, liftY: 0.01, shiftX: -0.06 });
       p?.step(SCREEN_DELTA['+z']);
     }, { settle: 7 }),
+
+    /**
+     * teach-00, the campaign opener — a tribar of side 4 with a detached bar.
+     *
+     * Same reason as the six level plates above: without a shot, a level has no
+     * pixel coverage at all. It matters more here than anywhere else in the set,
+     * because this is the first thing a player ever sees and the only level
+     * whose picture is load-bearing for whether the game is comprehensible.
+     *
+     * Framed a little tighter than the tribar constant because the detached bar
+     * pushes the figure's extremes further right than any bare tribar reaches.
+     */
+    teach00: Object.assign(plate(0, { fillY: 0.70, fillX: 0.80, liftY: 0.02 }),
+      { level: 'teach-00' }),
   };
+
+  /**
+   * THE SHOTS BELOW ARE COMPOSED AGAINST loop-01'S GEOMETRY, AND NOW SAY SO.
+   *
+   * They used to declare no level and capture DEFAULT_LEVEL, which was loop-01
+   * — so the dependence was real but invisible, carried by a constant in
+   * another file. Several of them name loop-01 cells outright: `seam` frames
+   * (5,5,5), `avatar` frames (1,1,0), `avatarmid` and `stepmid` place the pawn
+   * at 5,5,x, and the three orbit shots place it at 1,0,0.
+   *
+   * DEFAULT_LEVEL is now teach-00, whose tribar has side 4 and contains no
+   * (5,5,x) cell at all. Left implicit, every shot here would have gone on
+   * capturing successfully while framing coordinates that no longer exist —
+   * a whole set of green plates composed against nothing.
+   */
+  for (const name of [
+    'hero', 'seam', 'wide', 'offaxis', 'rot1', 'rot2', 'rot3',
+    'avatar', 'avatarmid', 'orbitmid', 'orbitlate', 'orbitback', 'stepmid',
+  ]) {
+    shots[name].level = 'loop-01';
+  }
+
+  return shots;
 }

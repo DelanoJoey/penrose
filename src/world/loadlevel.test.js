@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
 import world from './index.js';
-import { LEVELS, DEFAULT_LEVEL } from './levels.js';
+import { LEVELS, DEFAULT_LEVEL, ORDER } from './levels.js';
 import { rotateY } from '../geometry/index.js';
 
 /**
@@ -30,6 +30,15 @@ function harness({ level = null, capture = false } = {}) {
   };
   return { ctx, scene, events, of: (n) => events.filter((e) => e.event === n) };
 }
+
+test('DEFAULT_LEVEL is the first level of the campaign', () => {
+  // src/campaign seeds its index from whichever level arrives, so a default
+  // that is not ORDER[0] silently starts the run partway in and the opening
+  // level is never played. That is invisible in every other test here: the
+  // level loads, the campaign advances, and nothing is out of place except
+  // which level a player actually begins on.
+  assert.equal(DEFAULT_LEVEL, ORDER[0]);
+});
 
 test('init loads DEFAULT_LEVEL when config names none', async () => {
   const h = harness();

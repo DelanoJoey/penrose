@@ -114,6 +114,9 @@ Target selection is the engineering decision.
 | `tools/imagediff.mjs` | Per-pixel gate. Strict identity by default; `--tol` is an explicit opt-out |
 | `tools/profile.mjs` | Frame-time distribution and hitch attribution via per-frame WebGL program counts |
 | `tools/analyze.mjs` | Level design asserts — is the level solvable, and is the illusion load-bearing? |
+| `tools/search.mjs` | Figure search: closed four-leg circuits, filtered cheap-first before any render |
+| `tools/teach.mjs` | Teaching-level search — a forced illusion crossing between two visibly separate objects |
+| `tools/playthrough.mjs` | Plays a level through the lockstep pump at exact frame timing |
 | `tools/grade.mjs` | Blind pairwise grading: seeded blinding, position-bias check, inter-judge agreement |
 
 ### Blind grading

@@ -81,6 +81,66 @@ function tribar(n) {
 }
 
 /**
+ * teach-00 — the level that teaches the rule the game is built on.
+ *
+ * WHY THE CAMPAIGN NEEDED THIS. The central rule — screen-adjacent means
+ * walkable — was never stated anywhere and is not inferable from a still frame.
+ * A player who owns the project spent an hour without finding it, asked "what
+ * is the green thing", and logged 31 moves on a level whose optimum is 8. Those
+ * were 31 SUCCESSFUL walks; `moves` only increments on a landed step. He was
+ * not fighting dead keys, he was brute-forcing an unstated rule.
+ *
+ * loop-01 was meant to carry that lesson and cannot: it solves in one move, so
+ * the trick fires before the player has registered that walking is a thing.
+ *
+ * THE SHAPE. A tribar of side 4, plus a three-cell bar hung in space at
+ * (-1,-1,-6). The bar is a SEPARATE 3D object — nothing touches the tribar —
+ * but it is screen-adjacent to the tribar's top corner at exactly one point.
+ * Found by tools/teach.mjs, which is the tool this level exists because of;
+ * every property below is one of its filters and each is proved in
+ * test/teaching-level.test.js rather than trusted.
+ *
+ *   walk 4 ordinary steps down the +z leg   the player learns that walking works
+ *   arrive at (4,4,0)                       the walkable surface visibly ENDS
+ *   step across 16 units of nothing         the only legal move there is
+ *   walk 2 more along the far bar           confirmation of having arrived
+ *
+ * WHAT THIS LEVEL CANNOT DO, AND WHY THAT IS NOT A DEFECT IN IT. It cannot make
+ * the crossing LOOK impossible. A crossing moves the avatar exactly one screen
+ * cell, which is precisely what an ordinary walk does, so the two are
+ * pixel-indistinguishable by construction — measured on three different
+ * candidate shapes, by playthrough, before this one was chosen. Trying to build
+ * a level whose gap READS as a gap is trying to defeat the mechanic.
+ *
+ * So the lesson is carried by the setup rather than by the step: the goal sits
+ * on an object the player can see is not the one they are standing on, the
+ * surface under them runs out, and the one input that does anything is the one
+ * that crosses. tribar(4) rather than tribar(5) so that this and loop-01, which
+ * follows it, are not the same picture twice.
+ */
+function teach00() {
+  return {
+    name: 'teach-00',
+    cells: [...tribar(4), [-1, -1, -6], [0, -1, -6], [1, -1, -6]],
+    start: [4, 4, 4],
+    goal: [1, -1, -6],
+    premise: { turn: false, illusion: true, minWalks: 7, minTurns: 0, openWithWalk: true },
+    /**
+     * The properties that make this a TEACHING level rather than merely a
+     * solvable one. Declared so test/teaching-level.test.js can measure them.
+     * Every one of these is a thing a later edit could quietly destroy while
+     * leaving the level solvable and every existing test green.
+     */
+    teaches: {
+      runUp: 4,                 // ordinary walks before the gap
+      pivot: [4, 4, 0],         // where the walkable surface ends
+      landing: [-1, -1, -6],    // the near end of the far object
+      after: 2,                 // walks along the far object after landing
+    },
+  };
+}
+
+/**
  * spur-01 — the level that teaches the turn.
  *
  * A small tribar with a detached spur. Walking the figure never reaches the
@@ -241,6 +301,7 @@ function crook06() {
 }
 
 export const LEVELS = {
+  'teach-00': teach00(),
   'loop-01': loop01(),
   'probe-01': probe01(),
   'spur-01': spur01(),
@@ -251,7 +312,15 @@ export const LEVELS = {
   'crook-06': crook06(),
 };
 
-export const DEFAULT_LEVEL = 'loop-01';
+/**
+ * What loads when nothing is asked for — which is what a player who opens the
+ * game gets, and therefore what the campaign starts on.
+ *
+ * This MUST track ORDER[0]. src/campaign seeds its index from whatever level
+ * arrives, so a default that is not the first level starts the run partway in
+ * and the opener is never played. Asserted in loadlevel.test.js.
+ */
+export const DEFAULT_LEVEL = 'teach-00';
 
 /**
  * The campaign, in order. Separate from LEVELS on purpose.
@@ -259,20 +328,38 @@ export const DEFAULT_LEVEL = 'loop-01';
  * LEVELS is the full registry and stays reachable by `?level=`; probe-01 is a
  * two-cell fixture and belongs in the registry but not in a playthrough.
  *
- * loop-01 opens, which reverses what the spec for this phase said. The spec
- * argued it "teaches nothing and wins itself" because it solves in one move.
- * That one move is the entire mechanic — a single sideways step that crosses
- * fourteen units — and loop-01 is the only level whose figure is the bare
- * tribar with nothing hung off it. As an opener that is the cleanest possible
- * statement of what this game is. The turn is introduced immediately after.
+ * teach-00 opens, and loop-01 — which used to open — now runs second.
  *
- * The curve is then the measured `minTurns` of each level: 0, 1, 2, 3, 4, 5, 6.
+ * THE ARGUMENT THAT PUT loop-01 FIRST WAS RIGHT ABOUT THE FIGURE AND WRONG
+ * ABOUT THE PLAYER. It ran: loop-01 solves in one move, that one move IS the
+ * mechanic, and loop-01 is the only level whose figure is the bare tribar with
+ * nothing hung off it, so as an opener it is the cleanest statement of what
+ * this game is. Every clause is true. It is a statement of what the game is to
+ * someone who already knows — and it was made by the person who built the
+ * mechanic, about a level they could already solve.
+ *
+ * What it cost: a player spent an hour without inferring the rule and logged 31
+ * successful walks on an 8-move level. A level that wins itself in one move
+ * cannot teach, because the trick fires before the player has registered that
+ * anything happened. See teach-00's header.
+ *
+ * loop-01 keeps slot 2 unchanged. Following a level that made the crossing
+ * unavoidable, its one-move win reads as "you already know this" rather than as
+ * a freebie, and it still introduces the bare tribar. The turn arrives at
+ * spur-01, immediately after.
+ *
+ * The curve is then the measured `minTurns` of each level: 0, 0, 1, 2, 3, 4, 5, 6.
  *
  * The run changes FAMILY at shelf-03 -> arm-04, not just difficulty. The first
- * four levels are one tribar at four sizes; the last three are four-leg
- * circuits that double back. That break is deliberate and is the point of the
- * phase — a player who has learned to read a tribar meets a figure that does
- * not resolve the same way, at the moment the turn count starts to bite.
+ * five levels are one tribar at four sizes (4/5/3/4/5); the last three are
+ * four-leg circuits that double back. That break is deliberate and is the point
+ * of the phase — a player who has learned to read a tribar meets a figure that
+ * does not resolve the same way, at the moment the turn count starts to bite.
+ *
+ * teach-00 is a tribar for that reason and not by default: the opener has to
+ * establish the figure the next four levels vary, or the break at arm-04 breaks
+ * nothing. It is side 4 rather than 5 so that it and loop-01 are not the same
+ * picture twice.
  *
  * Each minTurns is the MEASURED turnsInRoute for that level's start/goal pair,
  * never a slack bound. levels.test.js asserts `turnsInRoute >= minTurns`, so
@@ -309,6 +396,7 @@ export const DEFAULT_LEVEL = 'loop-01';
  * before changing any of this.
  */
 export const ORDER = [
+  'teach-00',                                    // tribar 4 + a detached bar
   'loop-01', 'spur-01', 'span-02', 'shelf-03',   // tribar, sizes 5/3/4/5
   'arm-04', 'perch-05', 'crook-06',              // four-leg doubled-back circuit
 ];
