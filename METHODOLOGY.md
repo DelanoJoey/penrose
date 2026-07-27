@@ -1817,6 +1817,89 @@ only thread left that has not been cut.
 
 ---
 
+## P15 — the campaign curve was a tie-break
+
+**Completed 2026-07-27.** P11 produced evidence against `findRoute` costing a
+turn and a walk equally: a turn is 0.45 s and a walk 0.22 s, so a turn is 2.05x.
+`findRoute`'s own docstring set the condition for revisiting — *"recorded rather
+than weighted, because no evidence yet says what a better weighting would be"* —
+and the evidence had arrived. So the router was re-costed and measured before
+anything was changed.
+
+### The change is not worth making
+
+Uniform-cost search with the true weights, against the current BFS, on all seven
+levels:
+
+| | routes changed | campaign completion |
+|---|---|---|
+| equal cost (current) | — | 20.67 s |
+| time-weighted 0.22 / 0.45 | **1 of 7** | 20.21 s |
+
+**Six of seven routes are already time-optimal.** The one that changes is
+`perch-05`, and the whole campaign-wide saving is **0.46 seconds**. Weighting it
+would also break `levels.test.js` and make `ORDER`'s curve non-monotonic.
+
+Crucially, **`crook-06` does not change.** It is 71% rotation by wall-clock
+because the level requires 6 turns against 5 walks, not because the router chose
+badly. The router was never the problem, and if `crook-06` drags the lever is
+level design or `ORBIT_SECONDS` — not routing. **Recommendation: do not weight
+`findRoute`.**
+
+### But the measurement found something worse
+
+Both `perch-05` routes are **15 inputs**. BFS did not choose a worse route; it
+broke a tie. One tie has 5 turns, the other has 3, and BFS returns the 5.
+
+`ORDER` declares `perch-05` at `minTurns: 5`, described as "the MEASURED
+turnsInRoute … never a slack bound". `levels.test.js:28` asserts
+`turnsInRoute >= minTurns`, so **5 >= 5 passes while the level requires 3.**
+
+That docstring names this exact failure mode — "declaring 4 on a route that takes
+6" — **in one direction only.** The premise system was built to stop a
+declaration being too LOW. Nothing stopped it being too HIGH, and nothing could,
+because the assertion compares the declaration against the same arbitrary route
+that produced it. **A test validating its own input.**
+
+The campaign curve is therefore
+
+```
+declared   0, 1, 2, 3, 4, 5, 6
+actual     0, 1, 2, 3, 4, 3, 6      not non-decreasing
+```
+
+### And it cannot be fixed by re-declaring
+
+Searched exhaustively over all 18x17 start/goal pairs on `perch-05`: **zero**
+have a true minimum of 5, and the highest the figure supports anywhere is **4**.
+The level cannot honestly fill the slot it was built for. Filling it needs a
+different figure — and P8 left 1,255 augmented shapes at exactly 4 turns and 104
+at 5 sitting unexplored in `tools/search.mjs`.
+
+### What shipped
+
+`Structure.minTurnsBetween` — uniform-cost search that minimises turns and uses
+walks only to break ties — exposed through `premise().minTurnsExact`.
+`test/true-minturns.test.js` asserts `declared === exact` for every level **except
+`perch-05`, which is PINNED as a fixture** in the same style as the hole
+detector's necessary-not-sufficient case. The fixture records the defect rather
+than papering over it, because closing it is a design decision and not a
+mechanical correction. Its docstring says explicitly: when it is fixed, replace
+it with the stronger claim, never delete it.
+
+Both new guards falsified before being trusted — making turns cost the same as
+walks, and stubbing the search to a constant. Each failed the tests that claim
+it. 197 tests pass.
+
+### Still open
+
+- **`perch-05` cannot fill the 5 slot.** Redesign it, replace it from the
+  unexplored pool, or accept a curve that is not monotonic. A design call.
+- `crook-06`'s subjective playtest, persistence, an ending, `_emit`'s missing
+  try/catch, and everything from P14 about panels.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted

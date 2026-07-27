@@ -372,6 +372,54 @@ export class Structure {
   }
 
   /**
+   * The fewest quarter turns any route from `fromCell` to `toCell` can use.
+   *
+   * Uniform-cost search over the same (cell, turns) state space `findRoute`
+   * explores, with a turn costing 1 and a walk costing effectively nothing — so
+   * it minimises TURNS and uses walk count only to break ties. That is a
+   * different question from `findRoute`'s, which minimises total keypresses and
+   * breaks ITS ties arbitrarily.
+   *
+   * Exists because the difference is not academic: `perch-05` reports
+   * `turnsInRoute: 5` and needs only 3, and the whole campaign curve is built
+   * on that number.
+   *
+   * @returns {number|null} fewest turns, or null if unreachable in every rotation
+   */
+  minTurnsBetween(fromCell, toCell) {
+    const graphs = [0, 1, 2, 3].map((t) => this.pathGraph(t));
+    const goal = cellId(...toCell);
+    const start = `${cellId(...fromCell)}@0`;
+
+    // Cost is (turns, walks) compared lexicographically, kept as one number so
+    // the frontier stays a simple scan. WALK_EPS is small enough that no
+    // reachable walk count can outweigh a single turn: the state space is
+    // cells x 4, so walks can never exceed that, and 1/(cells*4+1) per walk
+    // keeps their total strictly below 1.
+    const WALK_EPS = 1 / (this.cells.length * 4 + 1);
+    const dist = new Map([[start, 0]]);
+    const seen = new Set();
+
+    for (;;) {
+      let cur = null, best = Infinity;
+      for (const [k, d] of dist) if (!seen.has(k) && d < best) { best = d; cur = k; }
+      if (cur === null) return null;
+      seen.add(cur);
+
+      const at = cur.lastIndexOf('@');
+      const id = cur.slice(0, at), turns = Number(cur.slice(at + 1));
+      if (id === goal) return Math.round(best);
+
+      const relax = (k, w) => {
+        const nd = best + w;
+        if (nd < (dist.get(k) ?? Infinity)) dist.set(k, nd);
+      };
+      for (const next of graphs[turns].get(id) ?? []) relax(`${next}@${turns}`, WALK_EPS);
+      for (const d of [1, 3]) relax(`${id}@${(turns + d) % 4}`, 1);
+    }
+  }
+
+  /**
    * Everything a level declares about itself, measured.
    *
    * `requiresTurn` is defined against turn 0 alone, because that is the state
@@ -392,6 +440,26 @@ export class Structure {
       solvable: route !== null,
       requiresTurn: route !== null && flat[0] === null,
       turnsInRoute: (route ?? []).filter((m) => m.kind === 'turn').length,
+      /**
+       * The FEWEST turns any route can use, which is not what `turnsInRoute`
+       * reports and is the number the campaign curve was always claiming.
+       *
+       * `findRoute` is a BFS in which a walk and a turn are one edge each, so
+       * among equally-short routes it returns whichever it reached first. That
+       * tie-break is arbitrary, and `turnsInRoute` inherits it. `perch-05` has
+       * two 15-input routes — one with 5 turns, one with 3 — and BFS happens to
+       * return the 5.
+       *
+       * `levels.test.js` then asserts `turnsInRoute >= minTurns`, which is slack
+       * in the direction that lets an OVERSTATEMENT through: 5 >= 5 passes while
+       * the level actually requires 3. The ORDER docstring names this failure
+       * mode in the other direction only ("declaring 4 on a route that takes 6")
+       * and the premise system was built to close exactly that half of it.
+       *
+       * So this is the honest number, and it is computed by a search that
+       * minimises turns rather than inputs.
+       */
+      minTurnsExact: this.minTurnsBetween(fromCell, toCell),
       walksInRoute: walks.length,
       usesIllusion: illusionWalks.length > 0,
       illusionWalks: illusionWalks.length,
