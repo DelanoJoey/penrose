@@ -156,7 +156,7 @@ with no network and no physics that must reconcile.
 
 `requestAnimationFrame` passes its callback a `DOMHighResTimeStamp`, so the
 delta comes from the argument and **`performance.now()` never enters
-`src/core/engine.js`**. That is not cosmetic: it lets the guard in §5 ban
+`src/core/engine.js`**. That is not cosmetic: it lets the guard in §6 ban
 wall-clock reads in the engine outright instead of carving out an exception that
 a later change could widen.
 
@@ -168,7 +168,7 @@ change is made as integration, by a single owner, with no fan-out.
 `start()` returns early when `config.lockstep` is set. Capture and gate runs are
 lockstep, so no captured frame can depend on the accumulator. That is an
 argument, and this project's own history says arguments of this shape get
-checked. §5 lists three checks, of which the byte-identical gate run is the only
+checked. §6 lists three checks, of which the byte-identical gate run is the only
 real evidence.
 
 ## 3. The recorder — `src/dev/trace.js`
@@ -206,7 +206,9 @@ the existing flags and following the `hud` pattern exactly.
 
 Each entry is `{ seq, frame, t, kind, name, payload }`:
 
-- `frame` is `ctx.time.frame` — the deterministic index;
+- `seq` is a monotonic counter, continuous across reloads within a session;
+- `frame` is `ctx.time.frame` — the deterministic index. It **resets to 0 on
+  reload**, which is why `seq` and `t` exist;
 - `t` is milliseconds since the recorder's own boot, from one `performance.now()`
   pair. **ARCHITECTURE §1.2 permits this and requires the file be named: it is
   `src/dev/trace.js`, and it is the only wall-clock read added by this phase.**
@@ -226,7 +228,7 @@ fail review.
 **It must be inert in capture and lockstep.** `src/ui` gates its keydown
 listener on `!(capture || lockstep)` because ARCHITECTURE §4 forbids any path
 that advances state outside `__PUMP__`. A second keydown listener is the same
-hazard. The recorder attaches nothing when `capture || lockstep`, and §5 asserts
+hazard. The recorder attaches nothing when `capture || lockstep`, and §6 asserts
 it.
 
 **It must be incapable of throwing.** `Engine._emit` has no try/catch
@@ -251,23 +253,104 @@ entry is O(n^2). Each entry is written under its own key,
 session is on the order of a few thousand entries at ~150 bytes, well inside the
 ~5 MB origin quota.
 
-`globalThis.__TRACE__` exposes `dump()` (JSON, all sessions) and `clear()`.
+**The session id is derived, not random.** `Math.random()` and `Date.now()` are
+both wrong here — the first is banned by ARCHITECTURE §1.1 and neither is
+needed. On boot the recorder scans `localStorage` for existing
+`penrose:trace:` keys, takes the highest session index it finds, and uses that
+index if the page was reloaded within the same session or that index **+ 1**
+for a new one. Distinguishing the two is what the protocol's explicit
+`__TRACE__.clear()` in §5.2 step 1 is for: a session begins when the store is
+empty. That keeps the recorder free of both a clock and an rng.
 
-### 3.4 Registration
+### 3.4 Getting the trace out of the browser
+
+`globalThis.__TRACE__` exposes:
+
+- `dump()` — every entry across every session in the store, as a JSON string,
+  ordered by `(session, seq)`;
+- `save()` — the same string offered as a file download via a Blob URL, named
+  `penrose-trace-<session>.json`. This is what §5.2 step 6 calls, because the
+  alternative is asking somebody to select several thousand lines out of a
+  devtools console at the end of a session, and losing the session to a
+  mis-click is a failure mode worth ten lines of code;
+- `clear()` — empties the store. Called deliberately at the start of a session,
+  never automatically.
+
+`save()` builds an object URL and clicks a detached anchor. That is DOM work in
+`src/dev`, it runs only on an explicit call, and it cannot execute in capture or
+lockstep because §3.5 leaves the subsystem unregistered there.
+
+### 3.5 Registration
 
 Added in `src/main.js` **first**, before `render`, and only when `config.trace`
 is set. First because `addEventListener` fires in registration order, so the
-recorder's keydown entry precedes the engine events that keypress causes, and
-the trace reads in causal order. The subsystem has no `update`, `fixedUpdate` or
-`draw`, so it adds nothing to the frame loop. With the flag unset nothing is
-registered and no listener is attached, so the gate sees an unchanged program.
+recorder's keydown entry precedes the engine events that keypress causes and the
+trace reads in causal order.
 
-## 4. The play-test protocol — `docs/playtest/PROTOCOL.md`
+That does not conflict with the existing "render is first so `ctx.engine.scene`
+exists for everyone else" comment at `src/main.js:27`: the recorder consumes
+`ctx.on` and `ctx.time` only, both of which exist from the `Engine`
+constructor, and it touches no scene. The subsystem has no `update`,
+`fixedUpdate` or `draw`, so it adds nothing to the frame loop. With the flag
+unset nothing is registered and no listener is attached, so the gate sees an
+unchanged program.
+
+## 4. The branching metric
+
+The measurement in "The finding this rests on" was made with a throwaway script.
+Committing it is the point: `tools/search.mjs`'s own header records that the
+previous phase's equivalent was thrown away and its reported pool size "cannot
+now be reproduced or diffed against". This phase does not choose levels — it
+makes the number that should choose them computable, so that work is not blind
+when it happens.
+
+### 4.1 `Structure.branching(fromCell, toCell)`
+
+Lives in `src/geometry/index.js` beside `minTurnsBetween` and `minWalksBetween`,
+because it needs remaining-cost-to-goal and those are the two methods that
+already compute it. Returns:
+
+```js
+{
+  positions,      // standable cell x rotation, over all four rotations
+  forks,          // positions with >= 2 neighbours that STRICTLY reduce cost
+  choices,        // positions with >= 2 legal walks, of any quality
+  maxDegree,      // most legal walks offered anywhere
+  zeroMoves,      // positions where only a rotation is legal
+}
+```
+
+Cost-to-goal is one breadth-first search from the goal over the **union** of the
+four rotations' path graphs, not one `minWalksBetween` per cell. Turns are free
+— the same decision, for the same reason, as in `minWalksBetween` — so walking
+cost is rotation-independent and the union graph gives an identical number for a
+fraction of the work. That equivalence is worth a test of its own, since it is
+the one place this metric could silently disagree with the method the move
+budget is built on.
+
+**`forks` is the number that matters and it needs its definition defended.** Two
+neighbours that both strictly reduce remaining walks means the player must pick
+and neither pick is forced. It deliberately does **not** count "walk forward or
+walk backward", which a first pass did count, reporting 173 of 358 where the
+honest answer is 1. A metric that counts corridors as decisions would send level
+selection somewhere worse than turn count did.
+
+### 4.2 Reporting and selection
+
+- `tools/analyze.mjs <level>` adds the five fields to its JSON report.
+- `tools/search.mjs` gains `--min-forks=N`, applied as a **late** filter, after
+  `minTurnsExact` and the standable-goal check and before `premise()` — the
+  cascade stays cheap-first, which is the ordering §P20 repaired.
+- Neither tool changes its existing output fields. A renamed or dropped field
+  silently kills whatever reads it, which is a gotcha this project has already
+  paid for once.
+
+## 5. The play-test protocol — `docs/playtest/PROTOCOL.md`
 
 Prose, not code, and versioned with the repo so a second session is comparable
 to the first.
 
-### 4.1 What is on trial
+### 5.1 What is on trial
 
 Each hypothesis is written with the observation that would falsify it, decided
 **before** the session rather than after.
@@ -281,40 +364,60 @@ Each hypothesis is written with the observation that would falsify it, decided
 
 H1 is the one that needs a fresh player. H2 and H3 do not.
 
-### 4.2 Procedure
+### 5.2 Procedure
 
-1. Fresh page at `?trace=1`. Confirm `__TRACE__` exists before handing over.
+1. Fresh page at `?trace=1`. Call `__TRACE__.clear()` — this is what begins a
+   session, and the recorder derives its session index from the store being
+   empty (§3.3). Confirm `__TRACE__` exists before handing over.
 2. The opening line is **scripted** and leaks nothing: *"This is a small game.
    Have a go. Say what you're thinking if you can."* No mention of adjacency,
    illusion, impossible geometry, the goal marker, or rotation.
 3. **No questions are answered during play.** A question is data: it is logged
    with the wall-clock time so it can be aligned against the trace.
-4. Stop at `campaign/complete`, or at 15 minutes, whichever comes first. Record
-   which.
-5. Dump the trace, then ask the fixed post-play questions.
+4. Reloading the page is allowed and is **not** interference — P17 records it as
+   the only escape from a bad position, so a player reaching for it is a finding.
+   The trace survives it.
+5. Stop at `campaign/complete`, or at 15 minutes, whichever comes first. Record
+   which, and record it before asking anything.
+6. Call `__TRACE__.save()` to write the file **before** the post-play questions,
+   so nothing depends on the tab surviving the conversation.
+7. Ask the fixed post-play questions.
 
-### 4.3 Output
+### 5.3 Output
 
-`~/claude/projects/penrose/PLAYTEST-2026-07-27-01.json` for the trace and
-`...-notes.md` for observations, per the working-files convention. The
-hypotheses are marked held or falsified against §4.1, with the trace line that
-decides each.
+Per the working-files convention:
 
-## 5. Tests
+```
+~/claude/projects/penrose/PLAYTEST-<YYYY-MM-DD>-<nn>.json    the trace
+~/claude/projects/penrose/PLAYTEST-<YYYY-MM-DD>-<nn>-notes.md  observations
+```
 
-| what | asserts |
+The notes mark each hypothesis in §5.1 held or falsified, and name the trace
+entry that decides it. A hypothesis with no entry that bears on it is recorded
+as **untested**, not as held.
+
+## 6. Tests
+
+`npm test` runs `node --test test/*.test.js src/*/*.test.js`. Both globs are
+exactly one level deep, so every path below is chosen to be collected — **a new
+test file placed anywhere else silently does not run**, which is this project's
+own documented failure shape and is not worth re-learning.
+
+| file | asserts |
 |---|---|
-| `engine.test.js` — lockstep | `start()` leaves `_running` false and schedules no rAF when `config.lockstep` |
-| `engine.test.js` — no clock | `src/core/engine.js` contains none of `performance.now`, `Date.now`, `new Date`, `Math.random` — source-level, in the style of `test/ui.test.js:108` |
-| `engine.test.js` — accumulator | a synthetic tick sequence at 120 Hz produces half as many `step()` calls as ticks; at 30 Hz, twice as many; a 30-second gap produces at most `MAX_STEPS` |
-| `trace.test.js` — inert | no listener attached and no subsystem registered when `capture` or `lockstep` |
-| `trace.test.js` — order | a keydown followed by `player/moved` records in that order with non-decreasing `seq` |
-| `trace.test.js` — isolation | a handler that throws does not prevent a later `ctx.on` listener from running |
-| `trace.test.js` — payload | the recorded payload is deep-equal to the emitted one and carries no added timestamp |
-| `geometry.test.js` — branching | `Structure.branching()` on hand-checked fixtures: a corridor has 0 forks, a diamond has 1 |
-| `true-minturns.test.js` — campaign | the campaign totals **1 fork across 358 positions**, so the number moves visibly when levels change |
+| `src/core/engine.test.js` — lockstep | `start()` leaves `_running` false and schedules no rAF when `config.lockstep` |
+| `src/core/engine.test.js` — no clock | `src/core/engine.js` contains none of `performance.now`, `Date.now`, `new Date`, `Math.random` — source-level, in the style of `test/ui.test.js:108` |
+| `src/core/engine.test.js` — accumulator | a synthetic tick sequence at 120 Hz produces half as many `step()` calls as ticks; at 30 Hz, twice as many; a 30-second gap produces at most `MAX_STEPS` |
+| `src/dev/trace.test.js` — inert | no listener attached and no subsystem registered when `capture` or `lockstep` |
+| `src/dev/trace.test.js` — order | a keydown followed by `player/moved` records in that order with non-decreasing `seq` |
+| `src/dev/trace.test.js` — isolation | a recorder handler that throws does not prevent a later `ctx.on` listener from running. **Must make the handler actually throw** — a version that does not is the P18/P19 failure repeating |
+| `src/dev/trace.test.js` — payload | the recorded payload is deep-equal to the emitted one and carries no added timestamp (ARCHITECTURE §3.3) |
+| `src/dev/trace.test.js` — reload | entries written under a second `frame` origin still order correctly by `seq` |
+| `src/geometry/branching.test.js` — fixtures | `Structure.branching()` on hand-checked shapes: a corridor has 0 forks, a diamond has 1 |
+| `src/geometry/branching.test.js` — agreement | the union-graph cost used by `branching()` equals `minWalksBetween` for every standable cell of every campaign level. This is the one place the metric could silently disagree with the number the move budget rests on |
+| `test/true-minturns.test.js` — campaign | the campaign totals **1 fork across 358 positions**, so the number moves visibly when levels change |
 
-## 6. Verification
+## 7. Verification
 
 - `npm test` — currently **227 pass, 0 fail**, verified in this worktree before
   any change.
@@ -323,21 +426,21 @@ decides each.
   above are cheaper checks that fail earlier.
 - The 1.844 measurement re-run after the fix, expecting `1.000 +/- 0.02`
   sim-seconds per wall-second on the 120 Hz panel.
-- Mutation testing on §5's guards, per the standing practice. P18 and P19 each
+- Mutation testing on §6's guards, per the standing practice. P18 and P19 each
   found a test that passed without exercising its subject; the `trace.test.js`
   isolation guard is the most likely repeat, because a test that never makes the
   handler throw will pass against an unwrapped implementation.
 
-## 7. Documentation debt found on the way
+## 8. Documentation debt found on the way
 
 ARCHITECTURE §3.3's event vocabulary table lists eight events. The project emits
 nine: **`level/failed` was added in P19 and never documented there.** The
 recorder subscribes to it, so the row is added in this phase.
 
-## 8. Out of scope, deliberately
+## 9. Out of scope, deliberately
 
 - **New levels.** The point of §1 is that the evidence for what to build does
-  not exist yet. §3's metric is built so that work is not blind when it happens.
+  not exist yet. §4's metric is built so that work is not blind when it happens.
 - **Any change to the movement model.** The proof in "The finding this rests on"
   says that is what making mistakes expensive would take. It is a bigger phase
   and it risks the one clean idea the game has.
@@ -368,5 +471,5 @@ traced this session — flagged, not claimed.**
 
 **`MAX_CATCHUP` and `MAX_STEPS` are chosen, not derived.** 0.25 s and 5 are
 conventional values. Nothing in this project measures them, and the spec should
-not pretend otherwise. They are falsifiable by the §5 accumulator test only in
+not pretend otherwise. They are falsifiable by the §6 accumulator test only in
 the sense that the test pins the behaviour they produce.
