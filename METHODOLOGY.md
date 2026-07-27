@@ -2261,6 +2261,115 @@ figure supports 5.
 
 ---
 
+## P19 — it is now possible to be wrong, and the first budget was aimed at the wrong player
+
+**Completed 2026-07-27.** There was no fail state anywhere in the project: no
+move limit, no timer, no lose condition, and `MOVES` displayed unbounded. A game
+you cannot be wrong in has no tension to resolve and no reason for a second
+attempt.
+
+### The design objection, and what answered it
+
+The obvious implementation — a keypress budget — is aimed at the wrong player.
+This game's one observed failure was somebody LOST (31 successful walks on a
+level whose par is 8), not somebody careless, and a 23-second game makes
+"restart the level" a non-punishment anyway. A budget that fires on confusion
+adds hostility without adding stakes.
+
+Two properties defuse that, and both are decisions rather than side effects:
+
+- **Turning is free.** Rotation is how the player LOOKS at the figure — it is
+  the only way to see what connects to what. `crook-06` needs 6 turns against 5
+  walks, so a keypress budget would have charged that level's players twice over
+  for looking, and two exploratory spins cost 8 keypresses while travelling
+  nowhere.
+- **A blocked key is free.** `step()` already counted nothing when it refused,
+  so probing a wall costs nothing. Only travel in the wrong direction does.
+
+What remains is a budget that fires on wandering and not on confusion.
+
+### The formula was wrong, and only the numbers said so
+
+First version: `par + MOVE_SLACK`, slack 10. It looked uniform. It was not:
+
+| level | par | platforms | budget | ratio |
+|---|---|---|---|---|
+| loop-01 | 1 | 10 | 11 | **1.1x** |
+| teach-00 | 7 | 12 | 17 | 1.5x |
+| crook-06 | 5 | 8 | 15 | 1.9x |
+
+**`loop-01`'s budget was 1.1x the size of its own figure.** A player who walked
+once round the tribar to look at it would have lost, on level two, for doing the
+thing the game is about. Anchoring on par is fine until par is tiny relative to
+the figure, and then it is absurd — and `loop-01` is exactly that case, par 1 on
+a ten-platform tribar.
+
+It surfaced as a test failure, not as a review: `traversal.test.js` walks
+back and forth across three rotations and started running out of moves. The
+first reading was "the test makes too many moves". The right reading was that
+the budget was too small for the figure.
+
+    budget = max(par, reachable platforms) + MOVE_SLACK
+
+"Enough walks to cross every platform in the level, or to walk your route,
+whichever is longer, plus ten." Every level now lands at 1.6x-2.1x, with no
+outlier, and it can never fall below `par + 10`. Checked against the one real
+datum available: the player who spent 31 walks lost on `shelf-03` would have
+been told at 23.
+
+### `par`, and the tie-break trap again
+
+`par` is the fewest WALKS a level can be solved in, and it replaces `minWalks`,
+which was asserted only as a lower bound (`walksInRoute >= minWalks`). That is
+the same slack that let `perch-05` declare 5 turns while requiring 3 — and a
+budget built on an overstated par silently hands out extra moves.
+
+So `Structure.minWalksBetween` was added as the mirror of `minTurnsBetween`
+(uniform cost, walks 1, turns epsilon — turns free for the same reason they are
+free in the budget), and `par` is asserted EXACT against it for every level.
+
+**It currently catches nothing**: `walksInRoute` happens to equal the true
+minimum on all eight levels. Worth saying plainly rather than implying the check
+found something. It is there because the budget rests on the number, not because
+it has caught a bug yet.
+
+### Mutation testing found two of its own tests weak
+
+Seven mutants, and the first run caught five. Both survivors were defects in the
+TESTS, not the code:
+
+- **`budget anchored on par alone` survived** because the test recomputed
+  `max(par, size) + MOVE_SLACK` itself instead of reading `player.budget()`. It
+  was asserting its own arithmetic. Reverting the implementation changed nothing
+  it looked at.
+- **`retry guarded on complete` survived** because the test loaded the last
+  level but never finished the run, so `complete` was false and the guard it
+  claimed to check was never reached. The reachable path is: finish the game,
+  press R on the last level — which clears the player's `solved` flag but not
+  the campaign's `complete` flag — then run out of moves.
+
+Both fixed; 7/7 on the re-run. This is the second consecutive phase where
+mutation testing found a test that passed without exercising its subject.
+
+### Ordering, which is the most reversible decision here
+
+The solve is checked BEFORE the fail, and the fail is gated on `!solved`. Swap
+them and the budget is one move tighter than it reads, on exactly the move that
+matters most — a player who spends every allowed walk and lands the last one on
+the goal would lose the level they just solved. Pinned by a test that sets
+`moves` to `budget - 1` directly rather than wandering towards the boundary and
+hoping to hit it; the first version of that test asserted only `if` the next
+step happened to be the goal, and it was not.
+
+### State
+
+223 tests, 20 gated shots, gate PASS. All eight levels play through solved, none
+close to its budget. The HUD reads `MOVES 19 / 19 · par 5` and `OUT OF MOVES —
+RETRYING`, in the warm ink rather than the accent, so winning and losing are
+told apart by colour rather than by position.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted

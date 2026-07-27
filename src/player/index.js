@@ -122,6 +122,49 @@ function pawnGeometry() {
 
 // ---------------------------------------------------------------- subsystem
 
+/**
+ * How many walks beyond par a level allows before it is lost.
+ *
+ * WHY A FAIL STATE AT ALL. There was none: no move limit, no timer, no lose
+ * condition, and `MOVES` displayed unbounded. A game you cannot be wrong in has
+ * no tension to resolve and no reason for a second attempt.
+ *
+ * WHY IT COUNTS WALKS AND NOT KEYPRESSES. Rotation is how the player LOOKS at
+ * the figure — it is the only way to see what connects to what — and `crook-06`
+ * needs 6 turns against 5 walks, so a keypress budget would have charged that
+ * level's players twice over for looking. Two exploratory spins cost 8
+ * keypresses and travel nowhere. Turning is therefore FREE, and so is a blocked
+ * key: `step()` counts nothing when it refuses, so probing a wall is free too.
+ * Only travel in the wrong direction costs anything.
+ *
+ * That is what makes this survivable for the player it would otherwise punish
+ * hardest. The reported failure on this game was somebody LOST — 31 successful
+ * walks on a level whose par is 8 — not somebody careless, and a budget that
+ * charged for looking around would have been aimed straight at them.
+ *
+ * WHY IT IS NOT MEASURED FROM PAR ALONE. That was the first version and it was
+ * wrong in a way only the numbers showed. `loop-01` has par 1 on a figure with
+ * ten standable platforms, so par + 10 gave it a budget of 1.1x its own size:
+ * a player who walked once round the tribar to look at it would lose, on level
+ * two, for doing the thing the game is about. Every other level landed at
+ * 1.5x-1.9x. Anchoring on par alone is fine until par is tiny relative to the
+ * figure, and then it is absurd.
+ *
+ * So the budget is measured from whichever is larger, the route or the figure:
+ *
+ *     budget = max(par, reachable platforms) + MOVE_SLACK
+ *
+ * which reads as "enough walks to cross every platform in the level, or to walk
+ * your route, whichever is longer — plus ten". It can never fall below par + 10,
+ * and it can never be small relative to the thing being explored.
+ *
+ * WHY 10 ON TOP. It is deliberately loose. This number exists to say "you are
+ * off the route", not to be the challenge — the challenge is par, which the HUD
+ * shows separately. Checked against the one real datum available: the player who
+ * spent 31 walks lost on `shelf-03` would have been told at 23.
+ */
+export const MOVE_SLACK = 10;
+
 export default {
   name: 'player',
 
@@ -136,6 +179,10 @@ export default {
     /** Quarter-turns the player has spent this level. Reported by level/solved. */
     this.rotations = 0;
     this.solved = false;
+    /** Set when the move budget runs out without the goal being reached. */
+    this.failed = false;
+    /** Cached budget for the current level. Null means "not yet computed". */
+    this._budget = null;
 
     // Derived-from-geometry caches, keyed by rotation. Pure functions of the
     // level, so caching them cannot change any answer — it only stops step()
@@ -187,6 +234,8 @@ export default {
       this.moves = 0;
       this.rotations = 0;
       this.solved = false;
+      this.failed = false;
+      this._budget = null;
       this._graphs.clear();
       this._visible.clear();
       this._illusions.clear();
@@ -222,7 +271,40 @@ export default {
    * it never creates one. So a direction the analyser says is impassable is
    * impassable here, in every rotation, by construction.
    */
+  /**
+   * The level's move budget: par plus MOVE_SLACK, in walks.
+   *
+   * Null when the level declares no par, which is the honest answer rather than
+   * a guessed one — a level with no measured par has no budget and cannot be
+   * lost. Read from the level rather than recomputed here, because par is
+   * asserted exact against the geometry in levels.test.js and a second
+   * derivation is a second thing that can disagree.
+   *
+   * @returns {number|null}
+   */
+  budget() {
+    const par = this.level?.premise?.par;
+    if (typeof par !== 'number' || !this.structure) return null;
+    if (this._budget === null) {
+      // Distinct platforms standable in ANY rotation — the honest size of what
+      // there is to walk on. Computed once per level: pure in the level, but
+      // four pathGraph builds is not something to repeat on every keypress or
+      // every HUD frame.
+      const reachable = new Set();
+      for (let t = 0; t < 4; t++) {
+        for (const c of this.structure.standable(t)) reachable.add(cellId(...c));
+      }
+      this._budget = Math.max(par, reachable.size) + MOVE_SLACK;
+    }
+    return this._budget;
+  },
+
   step(screenDelta) {
+    // A lost level is over. Without this the player keeps walking during the
+    // frames before the restart lands, and can stroll onto the goal AFTER
+    // running out of moves — which would make the fail state advisory.
+    if (this.failed) return false;
+
     const to = this._resolve(screenDelta);
     if (to === null) {
       if (this.cell && Array.isArray(screenDelta)) {
@@ -247,6 +329,18 @@ export default {
     if (!this.solved && to === this.goalId) {
       this.solved = true;
       this.ctx.emit('level/solved', { moves: this.moves, turns: this.rotations });
+    }
+
+    /**
+     * Out of moves. Checked AFTER the solve, and gated on `!this.solved`, so a
+     * final walk that lands on the goal wins even when it is the last one the
+     * budget allows. Reversing those two would make the budget one move
+     * tighter than it reads, on exactly the move that matters most.
+     */
+    const budget = this.budget();
+    if (!this.solved && budget !== null && this.moves >= budget) {
+      this.failed = true;
+      this.ctx.emit('level/failed', { moves: this.moves, budget, turns: this.rotations });
     }
     return true;
   },
@@ -311,6 +405,9 @@ export default {
       cell: this.cell,
       moves: this.moves,
       solved: this.solved,
+      failed: this.failed,
+      par: this.level?.premise?.par ?? null,
+      budget: this.budget(),
       level: this.level?.name ?? null,
     };
   },

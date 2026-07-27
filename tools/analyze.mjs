@@ -44,6 +44,8 @@ const report = {
     walksInRoute: p.walksInRoute,
     usesIllusion: p.usesIllusion,
     illusionWalks: p.illusionWalks,
+    minWalksExact: p.minWalksExact,
+    minTurnsExact: p.minTurnsExact,
     flatSolvableTurns: p.flatSolvableTurns,
   },
   perRotation: [0, 1, 2, 3].map((t) => ({
@@ -74,8 +76,8 @@ if (!decl) {
     problems.push(`declares turn: ${decl.turn} but measured requiresTurn: ${p.requiresTurn}`);
   if (decl.illusion !== p.usesIllusion)
     problems.push(`declares illusion: ${decl.illusion} but measured usesIllusion: ${p.usesIllusion}`);
-  if (decl.minWalks != null && p.walksInRoute < decl.minWalks)
-    problems.push(`declares minWalks: ${decl.minWalks} but the route has ${p.walksInRoute}`);
+  if (decl.par != null && p.minWalksExact !== decl.par)
+    problems.push(`declares par: ${decl.par} but the true minimum is ${p.minWalksExact}`);
   if (decl.minTurns != null && p.turnsInRoute < decl.minTurns)
     problems.push(`declares minTurns: ${decl.minTurns} but the route has ${p.turnsInRoute}`);
   if (decl.openWithWalk && p.route?.[0]?.kind !== 'walk')

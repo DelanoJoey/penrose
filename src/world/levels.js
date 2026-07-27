@@ -46,7 +46,7 @@ function loop01(n = 5) {
      * saying so out loud is what stopped this being mistaken for a level that
      * uses its own mechanic. See tools/analyze.mjs.
      */
-    premise: { turn: false, illusion: true },
+    premise: { turn: false, illusion: true, par: 1 },
   };
 }
 
@@ -60,7 +60,7 @@ function probe01() {
     cells: [[0, 0, 0], [4, 3, 3]],
     start: [0, 0, 0],
     goal: [4, 3, 3],
-    premise: { turn: false, illusion: true },
+    premise: { turn: false, illusion: true, par: 1 },
   };
 }
 
@@ -79,6 +79,20 @@ function tribar(n) {
   for (let k = 1; k <= n; k++) cells.push([n, n, k]);
   return cells;
 }
+
+/**
+ * `par` — the fewest WALKS a level can be solved in, and the number the move
+ * budget is measured against.
+ *
+ * It replaces the old `minWalks`, which was asserted only as a lower bound
+ * (`walksInRoute >= minWalks`). That is the weaker half of a claim this project
+ * has already been burned by: `perch-05` declared 5 turns and required 3, and
+ * every test passed, because `turnsInRoute` is whichever equally-short route
+ * BFS reached first rather than a minimum. `par` is asserted EXACT against
+ * `Structure.minWalksBetween`, so the same drift cannot happen on walks.
+ *
+ * Turns are free in that measurement, deliberately — see minWalksBetween.
+ */
 
 /**
  * teach-00 — the level that teaches the rule the game is built on.
@@ -124,7 +138,7 @@ function teach00() {
     cells: [...tribar(4), [-1, -1, -6], [0, -1, -6], [1, -1, -6]],
     start: [4, 4, 4],
     goal: [1, -1, -6],
-    premise: { turn: false, illusion: true, minWalks: 7, minTurns: 0, openWithWalk: true },
+    premise: { turn: false, illusion: true, par:7, minTurns: 0, openWithWalk: true },
     /**
      * The properties that make this a TEACHING level rather than merely a
      * solvable one. Declared so test/teaching-level.test.js can measure them.
@@ -155,7 +169,7 @@ function spur01() {
     cells: [...tribar(3), [1, 0, 3], [2, 0, 3], [3, 0, 3]],
     start: [1, 0, 0],
     goal: [3, 0, 3],
-    premise: { turn: true, illusion: true, minWalks: 7, minTurns: 1, openWithWalk: true },
+    premise: { turn: true, illusion: true, par:7, minTurns: 1, openWithWalk: true },
   };
 }
 
@@ -171,7 +185,7 @@ function span02() {
     cells: [...tribar(4), [0, 0, 3], [1, 0, 3], [2, 0, 3]],
     start: [1, 0, 0],
     goal: [2, 0, 3],
-    premise: { turn: true, illusion: true, minWalks: 8, minTurns: 2, openWithWalk: true },
+    premise: { turn: true, illusion: true, par:8, minTurns: 2, openWithWalk: true },
   };
 }
 
@@ -189,7 +203,7 @@ function shelf03() {
     cells: [...tribar(5), [6, 4, 0], [6, 4, 1]],
     start: [1, 0, 0],
     goal: [6, 4, 1],
-    premise: { turn: true, illusion: true, minWalks: 8, minTurns: 3, openWithWalk: true },
+    premise: { turn: true, illusion: true, par:8, minTurns: 3, openWithWalk: true },
   };
 }
 
@@ -249,7 +263,7 @@ function arm04() {
     ],
     start: [6, 1, 5],
     goal: [6, 0, 3],
-    premise: { turn: true, illusion: true, minWalks: 12, minTurns: 4, openWithWalk: true },
+    premise: { turn: true, illusion: true, par:12, minTurns: 4, openWithWalk: true },
   };
 }
 
@@ -270,7 +284,7 @@ function perch05() {
     ],
     start: [0, 4, -2],
     goal: [0, 0, 0],
-    premise: { turn: true, illusion: true, minWalks: 10, minTurns: 5, openWithWalk: true },
+    premise: { turn: true, illusion: true, par:10, minTurns: 5, openWithWalk: true },
   };
 }
 
@@ -296,7 +310,7 @@ function crook06() {
     ],
     start: [2, 0, 3],
     goal: [3, 3, 3],
-    premise: { turn: true, illusion: true, minWalks: 5, minTurns: 6, openWithWalk: true },
+    premise: { turn: true, illusion: true, par:5, minTurns: 6, openWithWalk: true },
   };
 }
 

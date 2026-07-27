@@ -420,6 +420,55 @@ export class Structure {
   }
 
   /**
+   * The fewest WALKS any route from `fromCell` to `toCell` can use.
+   *
+   * The mirror of `minTurnsBetween`, and it exists for the same reason: the
+   * walk count `findRoute` happens to return is its arbitrary tie-break, not a
+   * minimum. That confusion already shipped once — `perch-05` declared 5 turns
+   * and required 3 because nobody had computed the minimum — and the move
+   * budget is built directly on this number, so it has to be the honest one
+   * rather than whichever route BFS reached first.
+   *
+   * Turns cost effectively nothing here, which is the point rather than a
+   * simplification: rotation is how the player LOOKS at the figure, and a
+   * budget that charged for looking would tax the exploration this game is
+   * about. So the player may turn as much as they like, and only travel counts.
+   *
+   * @returns {number|null} fewest walks, or null if unreachable in every rotation
+   */
+  minWalksBetween(fromCell, toCell) {
+    const graphs = [0, 1, 2, 3].map((t) => this.pathGraph(t));
+    const goal = cellId(...toCell);
+    const start = `${cellId(...fromCell)}@0`;
+
+    // Cost is (walks, turns) compared lexicographically, kept as one number.
+    // TURN_EPS is small enough that no reachable turn count can outweigh a
+    // single walk: the state space is cells x 4, so turns can never exceed it,
+    // and 1/(cells*4+1) each keeps their total strictly below 1.
+    const TURN_EPS = 1 / (this.cells.length * 4 + 1);
+    const dist = new Map([[start, 0]]);
+    const seen = new Set();
+
+    for (;;) {
+      let cur = null, best = Infinity;
+      for (const [k, d] of dist) if (!seen.has(k) && d < best) { best = d; cur = k; }
+      if (cur === null) return null;
+      seen.add(cur);
+
+      const at = cur.lastIndexOf('@');
+      const id = cur.slice(0, at), turns = Number(cur.slice(at + 1));
+      if (id === goal) return Math.round(best);
+
+      const relax = (k, w) => {
+        const nd = best + w;
+        if (nd < (dist.get(k) ?? Infinity)) dist.set(k, nd);
+      };
+      for (const next of graphs[turns].get(id) ?? []) relax(`${next}@${turns}`, 1);
+      for (const d of [1, 3]) relax(`${id}@${(turns + d) % 4}`, TURN_EPS);
+    }
+  }
+
+  /**
    * Everything a level declares about itself, measured.
    *
    * `requiresTurn` is defined against turn 0 alone, because that is the state
@@ -461,6 +510,16 @@ export class Structure {
        */
       minTurnsExact: this.minTurnsBetween(fromCell, toCell),
       walksInRoute: walks.length,
+      /**
+       * The FEWEST walks any route can use — the level's par, and what the
+       * move budget is measured against.
+       *
+       * `walksInRoute` is not it, for exactly the reason `turnsInRoute` is not
+       * the minimum turn count: both are read off whichever equally-short route
+       * BFS reached first. A budget built on `walksInRoute` would be generous
+       * on some levels and impossible on others, and nothing would say which.
+       */
+      minWalksExact: this.minWalksBetween(fromCell, toCell),
       usesIllusion: illusionWalks.length > 0,
       illusionWalks: illusionWalks.length,
       flatSolvableTurns: [0, 1, 2, 3].filter((t) => flat[t]),

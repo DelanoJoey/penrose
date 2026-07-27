@@ -24,7 +24,12 @@ for (const [name, lv] of Object.entries(LEVELS)) {
     assert.equal(p.requiresTurn, d.turn, `${name} declares turn: ${d.turn}`);
     assert.equal(p.usesIllusion, d.illusion, `${name} declares illusion: ${d.illusion}`);
 
-    if (d.minWalks != null) assert.ok(p.walksInRoute >= d.minWalks);
+    // EXACT, not a lower bound. The old `minWalks >= ` form would accept a
+    // level declaring 8 that can be done in 3, which is the same shape of slack
+    // that let perch-05 declare 5 turns while needing 3. The move budget is
+    // par + a fixed slack, so an overstated par silently hands out extra moves.
+    if (d.par != null) assert.equal(p.minWalksExact, d.par,
+      `${name} declares par ${d.par} but its true minimum is ${p.minWalksExact}`);
     if (d.minTurns != null) assert.ok(p.turnsInRoute >= d.minTurns,
       `${name} declares minTurns: ${d.minTurns} but the route has ${p.turnsInRoute}`);
     if (d.openWithWalk) assert.equal(p.route[0]?.kind, 'walk');
