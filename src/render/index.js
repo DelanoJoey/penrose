@@ -68,8 +68,27 @@ export const INK = {
   /**
    * The misregistered plate: a second impression of every block, dropped
    * slightly down the page and pulled toward the red drum.
+   *
+   * EVERY CHANNEL MUST STAY BELOW 1. This was `[1.15, 0.62, 0.45]`, and the
+   * red lift is what broke it: 1.15 drove the red channel PAST full on two of
+   * the three plates — `faceTop 255,181,17 -> 255,146,8` and
+   * `faceRight 241,80,96 -> 255,63,65` — so the second impression stopped being
+   * a denser pass of the same ink and became a saturated primary line hugging
+   * the bottom of every silhouette.
+   *
+   * That is not a subtle failure. Three critic lenses independently reported it
+   * as a rendering defect ("bright hairline slivers"), and it was filed as one
+   * — issue #16 — before measurement showed it was this constant. By LUMA the
+   * old ghost was already darker on all three plates (-21.6 / -11.0 / -9.3);
+   * the eye was reading saturation, not brightness. Clamping is the mechanism.
+   *
+   * These values keep the warm pull toward the red drum (red is retained most)
+   * while landing every plate below full: `225,71,81` / `0,43,108` /
+   * `239,162,13`, measured peak red 230. Coverage is unchanged — 3861 ghost
+   * pixels before, 3979 after — so the misregistration still reads as clearly
+   * as it did. It just no longer reads as an error.
    */
-  ghost: [1.15, 0.62, 0.45],
+  ghost: [0.86, 0.78, 0.70],
   /**
    * How far down the page the second impression sits, in world units. A WORLD
    * offset, not a screen one, so zooming into the print magnifies the
@@ -109,8 +128,47 @@ export const INK = {
    * fully robust but left visible paper-coloured notches at every cell join.
    */
   ghostInset: 0.006,
-  /** Peak per-block ink density variation. Uneven lay-down, not noise. */
+  /**
+   * Peak ink density variation. Uneven lay-down, not noise.
+   *
+   * Amplitude only — WHERE it varies is `densityWavelength` below. Unchanged at
+   * 0.055 through the re-key, deliberately: the complaint was never the amount
+   * of variation, it was that neighbouring blocks drew it independently.
+   */
   densityJitter: 0.055,
+  /**
+   * Wavelength of the density field, in CELLS.
+   *
+   * Density used to be drawn per instance from `hash01(i)`, which is
+   * uncorrelated between neighbours — so every cube boundary got the maximum
+   * available contrast and the seams landed exactly on geometry edges. That is
+   * what made the variation read as rasterisation error rather than as ink, and
+   * three separate critic lenses reported it as a rendering defect.
+   *
+   * A real press varies density ACROSS THE SHEET, not per object. Sampling a
+   * smooth field at the cell instead makes neighbours nearly agree, so the step
+   * at a boundary is a fraction of the amplitude rather than all of it.
+   *
+   * STATED HONESTLY: this makes seams quieter, NOT absent. `instanceColor` is
+   * one colour per instance and the cube geometry is shared, so density cannot
+   * vary WITHIN a cube without a fragment-shader or per-vertex change — both
+   * blocked by the shared geometry and by the program-count budget. Longer
+   * wavelengths quiet the seam further but flatten the whole structure toward a
+   * single density; past roughly 24 cells the effect is gone entirely. Six is
+   * chosen against the levels that exist, which span 5-8 cells.
+   *
+   * MEASURED at the source rather than in pixels — the step in red-channel byte
+   * levels between every pair of face-adjacent cells, over ALL SEVEN levels:
+   *
+   *   per-instance   maxStep 7   meanStep 3.40 .. 3.82
+   *   smooth field   maxStep 2   meanStep 0.45 .. 0.87
+   *
+   * Computed from the level data with no rasterisation in the loop, because the
+   * first attempt at measuring this in pixels silently swallowed knockout and
+   * ghost pixels into the "face" band and reported nonsense (maxStep 59, and a
+   * clamp warning that fired even with jitter switched off).
+   */
+  densityWavelength: 6,
 };
 
 /**
@@ -330,6 +388,34 @@ function valueNoise(x, y, cell, salt) {
   const n01 = hash01(ix * 73856093 + (iy + 1) * 19349663, salt);
   const n11 = hash01((ix + 1) * 73856093 + (iy + 1) * 19349663, salt);
   return (n00 * (1 - sx) + n10 * sx) * (1 - sy) + (n01 * (1 - sx) + n11 * sx) * sy;
+}
+
+/**
+ * Trilinear value noise on the integer lattice. The 3D counterpart of the
+ * function above, used for ink density (INK.densityWavelength).
+ *
+ * Faded with smootherstep rather than the 2D version's smoothstep, deliberately:
+ * this field is sampled at INTEGER cell positions, so what matters is the step
+ * between two samples one unit apart, and smootherstep's zero second derivative
+ * is what keeps that step small near the lattice corners where smoothstep's is
+ * largest. The paper's tooth has no such constraint — it is sampled densely and
+ * wants the cheaper fade.
+ *
+ * Pure, deterministic, integer-mixed, consumes no rng stream — same contract as
+ * hash01, for the same reason (ARCHITECTURE.md §2).
+ */
+export function valueNoise3(x, y, z, cell, salt) {
+  const fx = x / cell, fy = y / cell, fz = z / cell;
+  const ix = Math.floor(fx), iy = Math.floor(fy), iz = Math.floor(fz);
+  const sx = smootherstep(fx - ix), sy = smootherstep(fy - iy), sz = smootherstep(fz - iz);
+  const corner = (a, b, c) =>
+    hash01(a * 73856093 + b * 19349663 + c * 83492791, salt);
+  const lerp = (p, q, t) => p * (1 - t) + q * t;
+  const face = (c) => lerp(
+    lerp(corner(ix, iy, c), corner(ix + 1, iy, c), sx),
+    lerp(corner(ix, iy + 1, c), corner(ix + 1, iy + 1, c), sx),
+    sy);
+  return lerp(face(iz), face(iz + 1), sz);
 }
 
 /**

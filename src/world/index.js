@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { paintByNormal, PALETTE, INK, hash01, TURN_RADIANS } from '../render/index.js';
+import { paintByNormal, PALETTE, INK, valueNoise3, TURN_RADIANS } from '../render/index.js';
 import { Structure, rotateY, cellId } from '../geometry/index.js';
 import { LEVELS, DEFAULT_LEVEL, ORDER } from './levels.js';
 
@@ -209,11 +209,24 @@ export default {
       m.setPosition(x * CELL, y * CELL - INK.ghostDropY, z * CELL);
       this.mesh.setMatrixAt(n + i, m);
 
-      // Ink density varies block to block. Keyed on the instance INDEX, never
-      // on the rotated position, so a quarter turn cannot reshuffle it — which
-      // would put the tone convention right back where it started.
-      const d = 1 + (hash01(i, 0x51ed) - 0.5) * 2 * INK.densityJitter;
-      const g = 1 + (hash01(i, 0x9a2b) - 0.5) * 2 * INK.densityJitter;
+      // Ink density varies ACROSS THE SHEET — sampled from a smooth field at
+      // the cell, not drawn independently per block.
+      //
+      // This used to be hash01(i), i.e. uncorrelated between neighbours, so
+      // every cube boundary carried the full amplitude as a step and the seams
+      // landed exactly on geometry edges. Three critic lenses independently
+      // reported that as a rendering defect; it was the art direction. See
+      // INK.densityWavelength for what this fixes and what it cannot.
+      //
+      // SAMPLED AT THE UNROTATED CELL, never at the rotated position. That is
+      // load-bearing and it is the same constraint the old index-keying met:
+      // a quarter turn must not reshuffle density, or the commit frame stops
+      // being pixel-identical and the tone convention is back where it started.
+      // Guarded by test/ink-invariance.test.js, which reads instanceColor at
+      // all four rotation states and asserts they agree.
+      const [cx, cy, cz] = cell;
+      const d = 1 + (valueNoise3(cx, cy, cz, INK.densityWavelength, 0x51ed) - 0.5) * 2 * INK.densityJitter;
+      const g = 1 + (valueNoise3(cx, cy, cz, INK.densityWavelength, 0x9a2b) - 0.5) * 2 * INK.densityJitter;
 
       const id = cellId(...cell);
       const knock = (id === startId || id === goalId) ? INK.knockout : ONE;
