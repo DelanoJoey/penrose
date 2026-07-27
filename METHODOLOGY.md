@@ -2123,6 +2123,144 @@ tried.
 
 ---
 
+## P18 — the level that teaches the rule, and the thing it cannot do
+
+**Completed 2026-07-27.** P17 gave the game an objective line, a goal marker and
+a key legend. It did not give it a level that teaches the one rule everything
+rests on: **screen-adjacent means walkable.** That rule is stated nowhere and a
+player who owns the project spent an hour without inferring it, logging 31
+successful walks on an 8-move level.
+
+`loop-01` was supposed to carry that lesson. It cannot: it wins in one move, so
+the trick fires before the player has registered that anything happened.
+
+### The measurement that reframed the task
+
+The assumption going in was that some existing level could be re-aimed — a
+different start or goal on a figure already in the repository. Measured across
+all eight figures, over every standable start/goal pair:
+
+| | |
+|---|---|
+| turn-0 routes whose illusion crossing is FORCED (removing the edge disconnects start from goal) | **212** |
+| of those, joining two visually separate objects | **2** |
+| of those, with any ordinary run-up before the crossing | **0** |
+
+Both survivors are the two directions of `probe-01`, a two-cell fixture with
+zero run-up that is not in the campaign. **Every other figure in the project is
+a single 3D-connected solid**, so its crossings read as walking a closed
+triangle rather than as stepping across a gap. Nothing that looks impossible
+ever happens anywhere in the shipping campaign.
+
+So no re-aiming could work, and `tools/search.mjs` could not produce a fix
+either — not by oversight, but by construction. It augments a figure by growing
+a spur FROM one of its cells, and an attached spur is in the same component as
+what it hangs off. It can only ever build more of the same solid.
+
+### `tools/teach.mjs`
+
+A cell screen-adjacent to `A` but arbitrarily far from it in 3D is exactly
+
+```
+L = A + step + t*(1,1,1),   step in {+x,-x,+z,-z},  t != 0
+```
+
+because `(1,1,1)` is the view direction and collapses to nothing on screen. `t`
+is the depth of the illusion. Hanging a DETACHED run at `L` is the difference
+between a figure that contains a crossing and one that shows it. The cascade,
+on the tribar family:
+
+```
+detached run placed, no collision                  27084
+not 3D-adjacent to the figure (two objects)        24969
+every run cell standable and frontmost             12784
+figure still encloses a hole                       12563
+run does not OCCLUDE the figure                     6510
+the two objects touch at ONE screen point           3808
+the far object TURNS AWAY (not a collinear beam)    2778
+EXACTLY ONE seam between the two objects            2778
+the pivot offers no alternative (corridor)           864
+run-up of >=2 ordinary walks first                   816
+premise: turn-0, no turns, opens with a walk         534
+distinct shapes                                      209
+```
+
+**The last four filters were all added after looking at rendered plates**, and
+each one exists because a shortlist that passed everything above it was wrong in
+the picture:
+
+- **Occlusion.** The top-ranked candidate of the first shortlist hung its bar at
+  (10,9,9), whose screen cells are `1,1 / 2,2 / 3,3` — exactly the tribar's own
+  bottom leg — sitting 27 depth units in front and hiding it. The plate is an
+  ordinary tribar whose bottom leg happens to be a separate floating object.
+  Cross-component passed; the picture merged. Pinned in
+  `test/teaching-level.test.js` as a negative control.
+- **One point of contact.** The seam check counts edges of the TRAVERSAL graph,
+  which is built from standable cells. The renderer draws every cell. The next
+  shortlist's leader touched the tribar at TWO screen positions and read as
+  welded onto it.
+- **Turning away.** Caught by playthrough, not by a plate: a candidate whose bar
+  ran in the same screen direction as the crossing rendered as one continuous
+  beam collinear with the arm the player walked in on.
+
+### What a teaching level cannot do, established rather than assumed
+
+**No level can make the crossing LOOK impossible.** A crossing moves the avatar
+exactly one screen cell, which is precisely what an ordinary walk does, so the
+two are pixel-indistinguishable by construction. Three separate candidate shapes
+were played through frame by frame to confirm it before the fourth was chosen.
+Building a level whose gap READS as a gap is trying to defeat the mechanic —
+screen adjacency IS visual contact, and that is the illusion, not a flaw in it.
+
+So the lesson is carried by the setup rather than by the step: the goal sits on
+an object the player can see is not the one they are standing on, the surface
+under them runs out, and the one input that does anything is the one that
+crosses. That is a weaker claim than "the player will see something impossible",
+and it is the true one.
+
+### `teach-00`
+
+A tribar of side 4 plus a three-cell bar hung in space at `(-1,-1,-6)`. Four
+ordinary walks down the `+z` leg, arrive where the walkable surface ends, cross
+16 units of nothing, two walks to the goal. Seven inputs, no rotation, measured
+by playthrough at 1.633 s. Side 4 rather than 5 so that it and `loop-01`, which
+now runs second, are not the same picture twice.
+
+`DEFAULT_LEVEL` moved to `teach-00` with it — otherwise a player opening the
+game starts on `loop-01`, `src/campaign` seeds its index from that, and the
+opener is never played. Asserted now in `loadlevel.test.js`.
+
+**That change exposed a dependency 13 shots had been carrying invisibly.** They
+declared no level and captured `DEFAULT_LEVEL`; several name `loop-01` cells
+outright — `seam` frames (5,5,5), `avatar` frames (1,1,0), `avatarmid` and
+`stepmid` place the pawn at 5,5,x. `teach-00`'s tribar has side 4 and contains
+no (5,5,x) cell at all. Left implicit, all 13 would have gone on capturing
+successfully while framing coordinates that no longer exist — a whole set of
+green plates composed against nothing. They now declare `loop-01`.
+
+### Guards
+
+Nine assertions in `test/teaching-level.test.js`, each re-applying a filter that
+`teach.mjs` used to FIND the level in order to KEEP it. **Five mutants, five
+caught** — start moved next to the pivot, bar attached to the figure, an extra
+platform at the pivot, the level demoted out of `ORDER[0]`, and a cell hung
+under the bar to create a second screen contact.
+
+A sixth mutant SURVIVED and was withdrawn rather than counted: lengthening the
+bar along `+x` cannot reach the tribar's screen columns (the bar's `a` is at
+least 5, the tribar's at most 4), so it violated nothing. The guard was right and
+the mutant was wrong, which is worth writing down because the opposite reading
+was available and would have weakened a correct test.
+
+### State
+
+212 tests, 20 gated shots, gate PASS. The campaign is eight levels and the curve
+is `0, 0, 1, 2, 3, 4, 5, 6`. `perch-05` is still pinned at B1 from the previous
+handoff — it declares 5 turns and requires 3, and no start/goal pair on that
+figure supports 5.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
