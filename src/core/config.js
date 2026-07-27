@@ -41,6 +41,17 @@ export function makeConfig(search = globalThis.location?.search ?? '') {
      * comparing frames that are a pure function of (config, frame).
      */
     hud: flag('hud'),
+    /**
+     * Play-session recording (src/dev/trace.js). Off by default and never set
+     * by any capture, so the gate sees an unchanged program — nothing is
+     * registered and no listener is attached unless this is on.
+     *
+     * It exists because P18, P19 and P20 each shipped against one person
+     * playing, and the whole of that observation was a sentence. See
+     * METHODOLOGY §P21 and
+     * docs/superpowers/specs/2026-07-27-playtest-and-frame-rate-design.md §3.
+     */
+    trace: flag('trace'),
     /** Lockstep: the page runs NO frame loop. Only __PUMP__ advances state. */
     lockstep: flag('lockstep'),
     /** Named shot to apply at boot, if any. */
