@@ -7,6 +7,7 @@ import player from './player/index.js';
 import ui from './ui/index.js';
 import audio from './audio/index.js';
 import { makeShots } from './dev/shots.js';
+import { createTrace } from './dev/trace.js';
 
 /**
  * Boot + lockstep harness hooks (ARCHITECTURE.md §4).
@@ -27,6 +28,14 @@ const engine = new Engine(config);
 // Registration order is the update order. render is first so ctx.engine.scene
 // exists for everyone else; world emits level/loaded, so it must be added after
 // player has had a chance to subscribe.
+// FIRST, when enabled. addEventListener fires in registration order, so the
+// recorder's keydown entry precedes the engine events that keypress causes and
+// the trace reads in causal order. It consumes ctx.on and ctx.time only — both
+// exist from the Engine constructor — so it does not need the scene the comment
+// above is about. With the flag unset nothing is registered, no listener is
+// attached, and the gate sees an unchanged program.
+if (config.trace) globalThis.__TRACE__ = await engine.add(createTrace());
+
 await engine.add(render);
 await engine.add(player);
 await engine.add(ui);

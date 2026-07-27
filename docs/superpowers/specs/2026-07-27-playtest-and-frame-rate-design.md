@@ -253,23 +253,30 @@ entry is O(n^2). Each entry is written under its own key,
 session is on the order of a few thousand entries at ~150 bytes, well inside the
 ~5 MB origin quota.
 
-**The session id is derived, not random.** `Math.random()` and `Date.now()` are
-both wrong here — the first is banned by ARCHITECTURE §1.1 and neither is
-needed. On boot the recorder scans `localStorage` for existing
-`penrose:trace:` keys, takes the highest session index it finds, and uses that
-index if the page was reloaded within the same session or that index **+ 1**
-for a new one. Distinguishing the two is what the protocol's explicit
-`__TRACE__.clear()` in §5.2 step 1 is for: a session begins when the store is
-empty. That keeps the recorder free of both a clock and an rng.
+**There is no session id, and that is the fix rather than a simplification.**
+An earlier draft of this section had the recorder derive a session index and use
+it "if the page was reloaded within the same session or that index + 1 for a new
+one". **The recorder cannot tell those two cases apart** without a clock or an
+explicit signal, so the rule was not implementable as written.
+
+What it does instead: **it continues whatever is already in the store.** Reloads
+accumulate into one session, which is what a play-test wants, since §5.2 step 4
+treats reaching for reload as a finding rather than an interruption. A session
+begins when the operator calls `clear()`, which §5.2 step 1 already requires.
+Keys are `penrose:trace:<seq>` with `seq` zero-padded so lexical order is
+numeric order. No clock, no rng, and nothing the recorder has to guess.
+
+`frame` and `t` both reset with the page. Rather than add state to reconcile
+them, the recorder writes one `{kind:'boot'}` entry at init, so a reader can see
+exactly where each page load begins.
 
 ### 3.4 Getting the trace out of the browser
 
 `globalThis.__TRACE__` exposes:
 
-- `dump()` — every entry across every session in the store, as a JSON string,
-  ordered by `(session, seq)`;
+- `dump()` — every entry in the store, as a JSON string, ordered by `seq`;
 - `save()` — the same string offered as a file download via a Blob URL, named
-  `penrose-trace-<session>.json`. This is what §5.2 step 6 calls, because the
+  `penrose-trace.json`. This is what §5.2 step 6 calls, because the
   alternative is asking somebody to select several thousand lines out of a
   devtools console at the end of a session, and losing the session to a
   mis-click is a failure mode worth ten lines of code;
