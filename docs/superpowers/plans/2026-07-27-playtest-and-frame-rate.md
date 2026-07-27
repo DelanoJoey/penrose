@@ -265,14 +265,32 @@ Expected: **232 pass, 0 fail** (227 + 5).
 This is the only real evidence that the accumulator cannot reach a captured
 frame. The two guards above are cheaper checks that fail earlier.
 
+**`npm run gate` is NOT the check that matters here.** It captures the shot set
+twice and diffs the two captures against each other — it proves the engine is
+deterministic *right now*, on whatever code it is pointed at. It would pass just
+as happily on a branch that changed every pixel. There are no committed baseline
+images in this repository, so a regression check has to be made by hand.
+
 ```bash
 npx playwright install chromium    # once per worktree
+
+# determinism, on the branch
 npm run gate
+
+# regression, branch against main -- the one that answers the question
+node tools/baseline.mjs --out=/tmp/shots-branch --port=5410
+cd /Users/jelstner/penrose && node tools/baseline.mjs --out=/tmp/shots-main --port=5430
+cd -  && node tools/imagediff.mjs --a=/tmp/shots-main --b=/tmp/shots-branch
 ```
 
-Expected: **20 shots, gate PASS**, byte-identical to `main`. If any shot
-differs, stop — `start()` has become reachable from a capture path and the
-change is wrong, not the gate.
+Expected: gate **PASS**, and imagediff reporting `"identical": true` over **20**
+shots with exit 0. If any shot differs, stop — `start()` has become reachable
+from a capture path and the change is wrong, not the gate.
+
+`tools/baseline.mjs` spawns its own vite and scans upward for a free port
+rather than reusing anything already listening (`tools/baseline.mjs:48-66`), so
+a stray dev server cannot make either capture measure the wrong tree. Do not
+"simplify" this by pointing both captures at one server.
 
 - [ ] **Step 7: Commit**
 
@@ -1158,13 +1176,16 @@ npm test
 Expected: **243 pass, 0 fail** (227 baseline + 5 engine + 7 trace + 4 branching).
 If the count differs, reconcile it before continuing — do not round.
 
-- [ ] **Step 2: Gate, byte-identical**
+- [ ] **Step 2: Gate, and the regression check it is not**
 
 ```bash
-npm run gate
+npm run gate                                    # determinism
+# and the branch-vs-main diff from Task 1 step 6, re-run against final HEAD
 ```
 
-Expected: 20 shots, **PASS**. This is the load-bearing check for Task 1.
+Expected: gate **PASS**, and `imagediff` reporting `"identical": true` over 20
+shots. The second one is the load-bearing check for Task 1; `gate` alone cannot
+see a regression, only nondeterminism.
 
 - [ ] **Step 3: Re-measure the frame rate**
 
