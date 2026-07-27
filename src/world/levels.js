@@ -279,6 +279,34 @@ export const DEFAULT_LEVEL = 'loop-01';
  * declaring 4 on a route that takes 6 would pass every test while making this
  * curve meaningless — which is the silent-drift failure the premise system was
  * built to close.
+ *
+ * ===================================================================
+ * AND IT CLOSED ONLY HALF OF IT. THE CURVE ABOVE IS NOT 0..6.
+ * ===================================================================
+ *
+ * `turnsInRoute` is not a minimum. `findRoute` is a BFS in which a walk and a
+ * turn are one edge each, so it minimises KEYPRESSES and, among equally short
+ * routes, returns whichever it reached first — an arbitrary tie-break that
+ * `turnsInRoute` then inherits.
+ *
+ * `perch-05` has two 15-input routes, one using 5 turns and one using 3. BFS
+ * returns the 5. So this level declares 5, requires 3, and
+ * `turnsInRoute >= minTurns` passes as 5 >= 5 — slack in exactly the direction
+ * the paragraph above did not consider. The real curve is
+ *
+ *     0, 1, 2, 3, 4, 3, 6      not      0, 1, 2, 3, 4, 5, 6
+ *
+ * and it is not non-decreasing.
+ *
+ * perch-05 CANNOT be fixed by re-declaring: searched exhaustively over all
+ * 18x17 start/goal pairs, the highest true minimum the figure supports anywhere
+ * is 4. Filling the 5 slot honestly needs a different figure, and tools/search.mjs
+ * has 1,255 augmented shapes at exactly 4 turns and 104 at 5, barely explored.
+ *
+ * `Structure.minTurnsBetween` is the honest number and `premise().minTurnsExact`
+ * reports it. test/true-minturns.test.js asserts declared === exact for every
+ * level except perch-05, which is PINNED as a fixture — see the note there
+ * before changing any of this.
  */
 export const ORDER = [
   'loop-01', 'spur-01', 'span-02', 'shelf-03',   // tribar, sizes 5/3/4/5
