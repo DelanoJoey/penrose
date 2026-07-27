@@ -1581,6 +1581,100 @@ perceptual win behind it.
 
 ---
 
+## P12 — the score was mostly the panel
+
+**Completed 2026-07-27.** P11 closed with a confound it created: 4.22 (P9) against
+6.91 (P11) is +2.69, of which only +0.54 was the HUD, and the remaining +2.15 sat
+undivided between P10's art change and run-to-run variance. This separates them,
+and the answer is not the flattering one.
+
+### The decomposition
+
+Two more panels, both on **pre-P10 art, HUD-free** — the same pixels P9 judged —
+using the same five lenses and the same rubric as P11, paired per shot. Run A and
+Run B differ in **nothing at all**: identical prompts, identical frames. Their
+difference is therefore pure sampling noise.
+
+| term | what varies | magnitude |
+|---|---|---|
+| **sampling noise** | nothing — identical prompts, identical frames | **0.14** |
+| **P10 art change** | the ink re-key | **0.02** |
+| **HUD** | HUD drawn or not | **0.54** |
+| **P9 vs this session** | panel wording, same art | **2.12** |
+
+```
+pre-P10 art, no HUD, run A .... 6.34      P9, same art, no HUD .... 4.22
+pre-P10 art, no HUD, run B .... 6.49
+post-P10 art, no HUD .......... 6.37      art  delta  +0.02
+post-P10 art, with HUD ........ 6.91      HUD  delta  +0.54
+```
+
+### Three readings, in order of how much they hurt
+
+**1. The HUD result survives.** +0.54 against a 0.14 noise floor is roughly four
+times noise. P11's finding stands, including that `storefront` goes *down* with
+the HUD.
+
+**2. The P10 art change is indistinguishable from zero.** +0.02, against a noise
+floor seven times larger. This is now the **third** instrument to decline to
+certify a perceptual win for the ink re-key: P10's blind A/B could not (agreement
+near chance), the per-judge split there was suggestive but uncertifiable, and this
+rubric puts it at nothing. The clamp was real and its removal is measurable in
+pixels — peak red 255 → 230, seam 7 → 2 byte levels — but **no panel has yet shown
+a human-visible improvement.** That is the honest status of P10.
+
+**3. The number was mostly the panel, and this is the one that matters.** The same
+art scored 4.22 under P9's wording and 6.34 under P11's. Sampling noise is 0.14,
+so **that 2.12 is not chance — it is prompt formulation.** Fifteen times the noise
+floor, and larger than every real effect measured in this project combined.
+
+`METHODOLOGY` §P9 concluded that Penrose "lands inside that band and below its
+final round" against Claude-of-Duty's 3.59 → 5.05, and treated that as the premise
+failing. **That comparison cannot bear the weight put on it.** It set two
+independently-authored panels, on different projects, in different eras, against
+each other, and the measured sensitivity of such a score to its own wording is
+±2 points. The differences being discussed were smaller than the instrument's
+dependence on how it was phrased.
+
+This does not rescue the premise — nothing here shows the project scores *well*.
+It says the 4.22 never carried the precision it was quoted with, and neither does
+6.91. **An absolute rubric score is an artifact of its panel. Only paired
+comparisons within one panel are trustworthy**, which is exactly why the HUD
+result is reportable and the cross-session one is not.
+
+### What the competence control does and does not catch
+
+Every judge in every P11/P12 panel passed the duplicate-frame control, most at
+d=0. The control works — and it is **blind to exactly the failure that dominates
+here**. It detects a judge that invents differences within a run. It cannot detect
+a panel that is internally consistent and calibrated two points away from another
+panel, because nothing inside a run reveals where its own scale sits.
+
+So the rule from P11 needs its companion: a lens must be shown capable of
+resolving the stimulus **before its verdict counts**, and its verdict counts
+**only against another verdict from the same panel**. Consistency is not
+calibration.
+
+### Per-lens, for anyone tempted to quote one
+
+Sampling noise at the lens level is far worse than the aggregate: `surface` moved
+8.22 → 7.00 and `storefront` 5.56 → 6.67 between two runs that differed in
+nothing. Per-frame-per-lens the standard deviation is 1.32 and the maximum
+single-cell swing is **3 points**. The aggregate is stable because those errors
+cancel; **no individual lens score in this document should be quoted alone.**
+
+### Still open
+
+- Whether the P10 ink change is perceptible to a human at all. Every automated
+  instrument says either "cannot tell" or "no difference".
+- A panel of genuinely different models, which is the only thing that would make
+  cross-panel calibration meaningful. Unchanged since P9, and now the highest
+  priority of the grading items rather than the lowest.
+- Everything else from P11: the `crook-06` playtest, `findRoute`'s equal cost,
+  persistence, an ending, the `-1` orbit, `_emit`'s missing try/catch.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
