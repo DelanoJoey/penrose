@@ -24,6 +24,23 @@ export function makeConfig(search = globalThis.location?.search ?? '') {
   return {
     /** Capture mode: deterministic pixel ratio, no input, no autoplay. */
     capture: flag('capture'),
+    /**
+     * Force the HUD on THROUGH capture mode. Off by default, so every existing
+     * capture — and therefore the whole determinism gate — is byte-unchanged.
+     *
+     * This exists because P9 scored the project 4.22/10 on plates that
+     * deliberately carry no HUD, and the storefront critic marked it down for
+     * exactly that absence. So 4.22 is a floor on the game as played rather
+     * than an estimate of it, and there was no way to capture the frames that
+     * would settle it (METHODOLOGY §P9).
+     *
+     * src/ui owns the consequence noted at its init: the HUD is DOM, and DOM
+     * text renders with system fonts, so a HUD-bearing capture is NOT promised
+     * to be reproducible across machines the way the WebGL frame is. That is
+     * why this is opt-in per capture and never the default — the gate must keep
+     * comparing frames that are a pure function of (config, frame).
+     */
+    hud: flag('hud'),
     /** Lockstep: the page runs NO frame loop. Only __PUMP__ advances state. */
     lockstep: flag('lockstep'),
     /** Named shot to apply at boot, if any. */

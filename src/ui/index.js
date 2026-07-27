@@ -315,18 +315,36 @@ export default {
   async init(ctx) {
     this.ctx = ctx;
 
+    /**
+     * `hud=1` forces the HUD on THROUGH capture mode; without it, capture hides
+     * it exactly as before. Default-off is what keeps every existing capture and
+     * the whole determinism gate byte-unchanged.
+     *
+     * THE OWNERSHIP THIS COMMENT USED TO ASSIGN, DISCHARGED. It read "if you
+     * make the HUD visible in capture, you own proving the gate still passes."
+     * The gate captures with the default config and therefore never turns this
+     * on, so it compares HUD-free frames as it always has — measured, not
+     * assumed: `npm run gate` PASSES on this commit.
+     *
+     * What a HUD-bearing capture gives up is stated rather than buried: the HUD
+     * is DOM, its text renders with system fonts, and font rasterisation is a
+     * property of the machine. Such a capture is reproducible on ONE machine,
+     * not across machines, which is precisely why it may not become the gate's
+     * default. Use it for grading plates, never for a pixel reference.
+     */
+    const showHud = !ctx.config.capture || ctx.config.hud;
+
     this.root = document.createElement('div');
     this.root.id = 'hud';
-    // Hidden during capture by default. If you make the HUD visible in capture,
-    // you own proving the gate still passes.
-    this.root.style.display = ctx.config.capture ? 'none' : 'block';
+    this.root.style.display = showHud ? 'block' : 'none';
     document.body.appendChild(this.root);
 
     /**
-     * Capture mode stops here. No stylesheet, no children, no listeners — the
-     * subsystem contributes literally nothing to a captured frame.
+     * Capture mode stops here — unless the HUD was explicitly asked for. No
+     * stylesheet, no children, no listeners: the subsystem contributes literally
+     * nothing to a captured frame.
      */
-    this.active = !ctx.config.capture;
+    this.active = showHud;
 
     /**
      * Input is gated SEPARATELY and more tightly than the HUD, on lockstep as

@@ -1,0 +1,135 @@
+{
+ "panel": "hud-on",
+ "rubric": "1-10 vs commercially shipped in its own style",
+ "lenses": [
+  "colour",
+  "communication",
+  "composition",
+  "storefront",
+  "surface"
+ ],
+ "key": [
+  {
+   "alias": "frame-01",
+   "shot": "crook06",
+   "duplicate": true
+  },
+  {
+   "alias": "frame-02",
+   "shot": "perch05",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-03",
+   "shot": "wide",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-04",
+   "shot": "avatarmid",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-05",
+   "shot": "rot1",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-06",
+   "shot": "arm04",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-07",
+   "shot": "offaxis",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-08",
+   "shot": "crook06",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-09",
+   "shot": "hero",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-10",
+   "shot": "seam",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-11",
+   "shot": "hero",
+   "duplicate": true
+  }
+ ],
+ "scores": {
+  "colour": {
+   "frame-01": 7,
+   "frame-02": 8,
+   "frame-03": 8,
+   "frame-04": 8,
+   "frame-05": 8,
+   "frame-06": 8,
+   "frame-07": 8,
+   "frame-08": 7,
+   "frame-09": 8,
+   "frame-10": 8,
+   "frame-11": 8
+  },
+  "composition": {
+   "frame-01": 7,
+   "frame-02": 7,
+   "frame-03": 7,
+   "frame-04": 5,
+   "frame-05": 7,
+   "frame-06": 8,
+   "frame-07": 6,
+   "frame-08": 7,
+   "frame-09": 7,
+   "frame-10": 4,
+   "frame-11": 7
+  },
+  "communication": {
+   "frame-01": 6,
+   "frame-02": 7,
+   "frame-03": 6,
+   "frame-04": 5,
+   "frame-05": 6,
+   "frame-06": 6,
+   "frame-07": 5,
+   "frame-08": 6,
+   "frame-09": 7,
+   "frame-10": 5,
+   "frame-11": 7
+  },
+  "storefront": {
+   "frame-01": 7,
+   "frame-02": 9,
+   "frame-03": 7,
+   "frame-04": 4,
+   "frame-05": 8,
+   "frame-06": 8,
+   "frame-07": 5,
+   "frame-08": 7,
+   "frame-09": 8,
+   "frame-10": 4,
+   "frame-11": 8
+  },
+  "surface": {
+   "frame-01": 7,
+   "frame-02": 8,
+   "frame-03": 8,
+   "frame-04": 8,
+   "frame-05": 8,
+   "frame-06": 7,
+   "frame-07": 7,
+   "frame-08": 7,
+   "frame-09": 8,
+   "frame-10": 8,
+   "frame-11": 8
+  }
+ }
+}

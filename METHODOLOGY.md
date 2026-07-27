@@ -1459,6 +1459,128 @@ give it a difference it cannot possibly see and check whether it reports one.
 
 ---
 
+## P11 — the HUD is worth half a point, and rotation eats the clock
+
+**Completed 2026-07-27.** Three of P10's open items, taken in the order that made
+each measurable: playtest `crook-06`, build the competence control, then re-grade
+with the HUD — the control first, because without it the re-grade's number means
+what P10's meant, which is nothing.
+
+### 1. `crook-06` — the rotation cost is worse than the input count says
+
+P7 recorded `findRoute` costing a turn and a walk equally as an open decision
+(`levels.js:227`), and P8 flagged `crook-06` as 55% rotations and unplaytested.
+
+The input count understates it, because the two are not the same length:
+
+```
+MOVE_SECONDS 0.22    ORBIT_SECONDS 0.45    a rotation costs 2.05x a walk
+```
+
+| level | turns | walks | % inputs rot | % TIME rot |
+|---|---|---|---|---|
+| spur-01 | 1 | 7 | 12.5% | 22.6% |
+| span-02 | 2 | 8 | 20.0% | 33.8% |
+| shelf-03 | 3 | 8 | 27.3% | 43.4% |
+| arm-04 | 4 | 12 | 25.0% | 40.5% |
+| perch-05 | 5 | 10 | 33.3% | 50.6% |
+| **crook-06** | 6 | 5 | 54.5% | **71.1%** |
+
+**Seven tenths of `crook-06`'s optimal completion is spent watching the camera
+swing.** And the orbit is dead time for its own purpose: `step()` is not refused
+mid-orbit, but it resolves against `this.turns`, which is still the PRE-commit
+rotation — so a player who rotates in order to open a route must wait the full
+0.45 s before that route exists. That is the first real evidence on the P5
+decision, and it argues the equal cost is wrong.
+
+`loop-01` is excluded rather than reported as zero: its premise is
+`{turn: false, illusion: true}` with no `minWalks` key at all, so a table row for
+it would be a default masquerading as a measurement.
+
+**The subjective half is still not done.** Driving the real build through a
+browser produced `document.hidden: true` and **0 frames per second** — Chrome
+throttles rAF in a background tab, so the engine ran 8 frames and stopped. The
+cell still advanced, because `step()` resolves its target immediately, which is
+exactly what makes it a convincing false instrument: it looks like play. Pacing
+is the whole question, so a frozen clock invalidates any impression of it. What
+is above is arithmetic on measured constants, not a verdict on whether it drags.
+
+### 2. The competence control — `--controls=N` and `gate`
+
+P10's finding was that three of five lenses were not resolving the stimulus and
+nothing noticed. `tools/grade.mjs` now mixes in pairs whose two sides are the
+same file, and `gate` disqualifies any judge that calls a winner on one. See the
+note on control pairs in `prepare`; the rule it implements is that **a lens must
+be shown capable of resolving the stimulus before its verdict counts.**
+
+`gate` fails closed on a panel with no controls, `prepare` warns when it builds
+one, and composites now get opaque `image-NN` aliases — promoting P9's manual
+filename-neutralising step into the tool, because a manual step is one that gets
+skipped.
+
+The alias hash needed an avalanche and **the test caught that it did not have
+one.** Plain FNV-1a leaves common-prefix strings adjacent in value, so sorting by
+it sorted by prefix: every real pair in one band, every control in the next,
+putting the controls in a block at the end where position alone gives them away.
+All five new guards were falsified before being trusted.
+
+### 3. The HUD re-grade — and P9's floor was real but small
+
+`config.hud` forces the HUD through capture mode, default off. Measured, not
+assumed: a default capture on this commit is `identical: true` against the P10
+set across all 18 shots, and `npm run gate` PASSES.
+
+Two panels, same five lenses, same rubric, same art, same nine shots, **paired
+per shot** — differing only in whether the HUD is drawn. Raw data in
+`docs/grading/2026-07-27-p11-*`.
+
+| lens | HUD-off | HUD-on | delta |
+|---|---|---|---|
+| colour | 7.61 | 7.89 | +0.28 |
+| communication | 3.28 | 5.89 | **+2.61** |
+| composition | 6.06 | 6.44 | +0.39 |
+| storefront | 7.56 | 6.67 | **−0.89** |
+| surface | 7.33 | 7.67 | +0.33 |
+| **overall** | **6.37** | **6.91** | **+0.54** |
+
+Every judge passed the competence control — the HUD panel at d=0 on both
+duplicate pairs, the HUD-free panel within the declared d≤1.
+
+**So P9's floor was real and small.** The handoff said "4.22 is a FLOOR — re-grade
+against HUD-bearing frames before quoting it anywhere," which implied the HUD was
+suppressing the number substantially. It is worth **+0.54**. Nearly all of the
+gain is `communication` (+2.61), which is the HUD doing precisely its job:
+naming the level, the move count, the view state and the controls.
+
+**`storefront` went DOWN with the HUD (−0.89)**, which inverts a P9 conclusion —
+that critic marked the plates down for the HUD's absence, and given it, marks
+them down for its presence. Store screenshots should stay HUD-free.
+
+### What this does NOT establish
+
+The naive reading — 4.22 then, 6.91 now — is **+2.69**, and only +0.54 of that is
+the HUD. The remaining **+2.15** sits between P9's HUD-free run and this one's,
+and it is **confounded**: the art changed in P10, and this is a different panel
+run with its own calibration. Those two are not separated here and must not be
+reported as if they were. Separating them needs this same competence-gated panel
+run against pre-P10 art, which has not been done.
+
+So: **do not quote 6.91 as "the score went up 2.7".** What is measured is the
+HUD's contribution, +0.54, and that P10's blind A/B still has no certified
+perceptual win behind it.
+
+### Still open
+
+- The **pre-P10 art run** that would separate the art change from panel variance.
+- Whether `crook-06` actually drags — needs a foregrounded browser or a human.
+- `findRoute`'s equal turn/walk cost, now with evidence against it but a
+  campaign-wide blast radius: every `minTurns` is a MEASURED value and `ORDER`
+  asserts them non-decreasing, so changing the cost re-derives the whole curve.
+- Everything else from P10: a panel of genuinely different models, persistence,
+  an ending, the `-1` orbit, `_emit`'s missing try/catch.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
