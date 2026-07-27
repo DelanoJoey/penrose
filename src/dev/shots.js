@@ -228,8 +228,8 @@ export function makeShots(ctx) {
      */
     arm04: Object.assign(plate(0, { fillY: 0.74, fillX: 0.84, liftY: 0.025 }),
       { level: 'arm-04' }),
-    perch05: Object.assign(plate(0, { fillY: 0.695, fillX: 0.82, liftY: 0.005 }),
-      { level: 'perch-05' }),
+    post05: Object.assign(plate(0, { fillY: 0.72, fillX: 0.80, liftY: 0.02 }),
+      { level: 'post-05' }),
     crook06: Object.assign(plate(0, { fillY: 0.74, fillX: 0.70, liftY: 0.02 }),
       { level: 'crook-06' }),
 

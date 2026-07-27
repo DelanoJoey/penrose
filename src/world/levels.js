@@ -268,12 +268,25 @@ function arm04() {
 }
 
 /**
- * perch-05 — five turns. A closed loop with the goal raised above it.
+ * perch-05 — RETIRED from the campaign. Kept as a registry fixture.
  *
- * The circuit doubles back on z and climbs, and a single cell hung on top of
- * the far leg carries the goal. One cell rather than a run, so the figure stays
- * a clean loop and the goal reads as sitting ON the structure rather than as a
- * separate object stuck to it.
+ * It held the five-turn slot and could not fill it: it declares 5 and requires
+ * 3. `turnsInRoute` is whichever equally-short route BFS reached first, and
+ * `levels.test.js` asserted only `turnsInRoute >= minTurns`, so 5 >= 5 passed
+ * while the level needed 3 — the campaign curve was reporting a routing
+ * artifact. Searched exhaustively over all 18x17 start/goal pairs: the highest
+ * true minimum this figure supports anywhere is 4, so no re-aiming could save
+ * it. Replaced by `post-05`.
+ *
+ * A SECOND defect, found while replacing it and worth recording because
+ * nothing in the project was looking for it: **its goal is not visible in the
+ * rotation the level opens in.** (0,0,0) is the circuit's closure point, and a
+ * closed circuit's far end aliases it while sitting IN FRONT of it, so the goal
+ * is occluded at turn 0 and standable only in rotations 1-3. It was the only
+ * shipping level where that was true. `ORDER` now asserts against it.
+ *
+ * Its declaration is corrected here rather than left at 5. A retired level with
+ * a false premise is still a false premise, and `analyze.mjs` reads this file.
  */
 function perch05() {
   return {
@@ -284,7 +297,56 @@ function perch05() {
     ],
     start: [0, 4, -2],
     goal: [0, 0, 0],
-    premise: { turn: true, illusion: true, par:10, minTurns: 5, openWithWalk: true },
+    premise: { turn: true, illusion: true, par: 10, minTurns: 3, openWithWalk: true },
+  };
+}
+
+/**
+ * post-05 — five turns, and the first level whose turn count is honestly five.
+ *
+ * A four-leg circuit doubling back on X, with a two-cell POST standing up from
+ * the near walkway. The post is what makes the route deep: it is standable, it
+ * is not where the goal is, and reaching the goal means rotating around it
+ * rather than through it.
+ *
+ * WHY THIS FIGURE AND NOT A RE-AIMED perch-05. Measured over all 102 four-leg
+ * circuits and 10,540 start/goal pairs, **no bare circuit supports a true
+ * minimum of 5 turns anywhere** — the ceiling is 4. Augmentation is the only
+ * route past it, which is also why `crook-06` reaches 6. The cascade over the
+ * 262 augmented pairs that do require exactly 5:
+ *
+ *     require exactly 5 TRUE turns                          262
+ *     goal standable, and so visible, at turn 0             150
+ *     not doubling back on Y, not arm-04's base, no mirrors   6
+ *     avatar not hidden behind its own figure                 3
+ *
+ * The Y exclusion is what does most of the cutting, not the visibility one —
+ * and it is a design choice rather than a correctness filter: `crook-06` is the
+ * only upright silhouette in the campaign and `ORDER` says so, so a second
+ * upright figure at level 7 would cost that claim. The alternatives it discards
+ * are longer (8 walks against this level's 5), and that is a real cost.
+ *
+ * THE LAST LINE OF THE CASCADE WAS NOT COMPUTED. Three of the six put the
+ * avatar behind the post at turn 0, and **no cell-level check sees it**: the
+ * occluding block sits at a different screen cell and covers only part of the
+ * pawn's rendered height, so `visibility()` reports the avatar's own screen
+ * cell as clear. It was caught by opening the plates. Again.
+ *
+ * `search.mjs` could not have found this. Its premise mode matches
+ * `turnsInRoute === TARGET` — the same tie-break number that produced
+ * `perch-05` — so its advertised pool of "5-turn" shapes is a pool of shapes
+ * whose BFS tie-break happens to return 5.
+ */
+function post05() {
+  return {
+    name: 'post-05',
+    cells: [
+      ...circuit([['-x', 2], ['+z', 3], ['+x', 5], ['+y', 3]]),
+      [-2, 1, 1], [-2, 2, 1],
+    ],
+    start: [3, 3, 3],
+    goal: [0, 0, 3],
+    premise: { turn: true, illusion: true, par: 5, minTurns: 5, openWithWalk: true },
   };
 }
 
@@ -323,6 +385,7 @@ export const LEVELS = {
   'shelf-03': shelf03(),
   'arm-04': arm04(),
   'perch-05': perch05(),
+  'post-05': post05(),
   'crook-06': crook06(),
 };
 
@@ -375,42 +438,34 @@ export const DEFAULT_LEVEL = 'teach-00';
  * nothing. It is side 4 rather than 5 so that it and loop-01 are not the same
  * picture twice.
  *
- * Each minTurns is the MEASURED turnsInRoute for that level's start/goal pair,
- * never a slack bound. levels.test.js asserts `turnsInRoute >= minTurns`, so
- * declaring 4 on a route that takes 6 would pass every test while making this
- * curve meaningless — which is the silent-drift failure the premise system was
- * built to close.
- *
  * ===================================================================
- * AND IT CLOSED ONLY HALF OF IT. THE CURVE ABOVE IS NOT 0..6.
+ * THE CURVE IS NOW 0,0,1,2,3,4,5,6 AND EVERY NUMBER IN IT IS MEASURED.
  * ===================================================================
  *
- * `turnsInRoute` is not a minimum. `findRoute` is a BFS in which a walk and a
- * turn are one edge each, so it minimises KEYPRESSES and, among equally short
- * routes, returns whichever it reached first — an arbitrary tie-break that
- * `turnsInRoute` then inherits.
+ * It was not, for four phases. `turnsInRoute` is not a minimum: `findRoute` is
+ * a BFS in which a walk and a turn are one edge each, so it minimises
+ * KEYPRESSES and, among equally short routes, returns whichever it reached
+ * first — an arbitrary tie-break that `turnsInRoute` inherits. `levels.test.js`
+ * asserted only `turnsInRoute >= minTurns`, which is slack in the direction
+ * that lets an OVERSTATEMENT through.
  *
- * `perch-05` has two 15-input routes, one using 5 turns and one using 3. BFS
- * returns the 5. So this level declares 5, requires 3, and
- * `turnsInRoute >= minTurns` passes as 5 >= 5 — slack in exactly the direction
- * the paragraph above did not consider. The real curve is
+ * `perch-05` held the 5 slot with two 15-input routes, one using 5 turns and
+ * one using 3. BFS returned the 5, so it declared 5, required 3, and 5 >= 5
+ * passed. The real curve read `0,1,2,3,4,3,6` and was not non-decreasing.
  *
- *     0, 1, 2, 3, 4, 3, 6      not      0, 1, 2, 3, 4, 5, 6
+ * It could not be fixed by re-declaring — no start/goal pair on that figure has
+ * a true minimum above 4 — so the figure was replaced. `post-05` requires 5,
+ * measured by `Structure.minTurnsBetween`, and `test/true-minturns.test.js` now
+ * asserts `declared === exact` for EVERY level with no exception pinned.
  *
- * and it is not non-decreasing.
- *
- * perch-05 CANNOT be fixed by re-declaring: searched exhaustively over all
- * 18x17 start/goal pairs, the highest true minimum the figure supports anywhere
- * is 4. Filling the 5 slot honestly needs a different figure, and tools/search.mjs
- * has 1,255 augmented shapes at exactly 4 turns and 104 at 5, barely explored.
- *
- * `Structure.minTurnsBetween` is the honest number and `premise().minTurnsExact`
- * reports it. test/true-minturns.test.js asserts declared === exact for every
- * level except perch-05, which is PINNED as a fixture — see the note there
- * before changing any of this.
+ * THAT SEARCH IS ALSO WHY `tools/search.mjs` DID NOT SUPPLY THE REPLACEMENT.
+ * Its premise mode matches `turnsInRoute === TARGET`, i.e. the same tie-break
+ * number that created the defect, so the "104 shapes at 5 turns" it advertises
+ * are shapes whose BFS tie-break happens to return 5. `post-05` was found by
+ * searching on `minTurnsBetween` instead — see METHODOLOGY §P20.
  */
 export const ORDER = [
   'teach-00',                                    // tribar 4 + a detached bar
   'loop-01', 'spur-01', 'span-02', 'shelf-03',   // tribar, sizes 5/3/4/5
-  'arm-04', 'perch-05', 'crook-06',              // four-leg doubled-back circuit
+  'arm-04', 'post-05', 'crook-06',               // four-leg doubled-back circuit
 ];

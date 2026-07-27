@@ -1114,6 +1114,10 @@ and everything downstream is.
 - The 102-figure pool was judged nine figures deep. There are 1,255 distinct
   augmented shapes at exactly 4 turns and 104 at 5; the vast majority have never
   been looked at.
+  > **Corrected in §P20.** Both counts were computed on `turnsInRoute`, which is
+  > a tie-break rather than a minimum, so neither is a count of shapes that
+  > REQUIRE that many turns. Measured properly, and requiring the goal to be
+  > visible in the opening rotation: **928 at 4 turns and 26 at 5.**
 - No persistence, and no ending beyond a HUD line. Unchanged from P7.
 - The `-1` orbit is still uncaptured, and `src/core/engine._emit` still has no
   try/catch. Both unchanged.
@@ -1876,6 +1880,11 @@ The level cannot honestly fill the slot it was built for. Filling it needs a
 different figure — and P8 left 1,255 augmented shapes at exactly 4 turns and 104
 at 5 sitting unexplored in `tools/search.mjs`.
 
+> **Corrected in §P20.** That pool was not what it said it was. `search.mjs`
+> selected on `turnsInRoute === TARGET` — the same tie-break number this section
+> is about — so it had been advertising shapes whose BFS tie-break returns N,
+> not shapes that require N. The real figures are 928 and 26.
+
 ### What shipped
 
 `Structure.minTurnsBetween` — uniform-cost search that minimises turns and uses
@@ -2367,6 +2376,111 @@ step happened to be the goal, and it was not.
 close to its budget. The HUD reads `MOVES 19 / 19 · par 5` and `OUT OF MOVES —
 RETRYING`, in the warm ink rather than the accent, so winning and losing are
 told apart by colour rather than by position.
+
+---
+
+## P20 — the campaign curve is finally the curve it claims, and the tool that broke it broke its own pool
+
+**Completed 2026-07-27.** `perch-05` held the five-turn slot while requiring
+three. It was pinned as a fixture in P15 rather than fixed, because closing it
+was a design decision: no start/goal pair on that figure has a true minimum
+above 4, so it needed a different figure.
+
+### The pool it was supposed to be replaced from did not exist
+
+The obvious move was to take a replacement from the 104 shapes `tools/search.mjs`
+advertises at 5 turns. **That pool was selected on `turnsInRoute`** — the same
+arbitrary BFS tie-break that produced `perch-05` in the first place. It had been
+reporting shapes whose tie-break happens to return N, not shapes that require N,
+and every count it has printed in premise mode since P8 counted the wrong thing.
+
+`perch-05` did not slip past that filter. It was produced by it.
+
+Measured on `minTurnsBetween` instead, and requiring the goal to be visible in
+the opening rotation, the real pool is **928 shapes at 4 turns and 26 at 5** —
+against the advertised 1,255 and 104.
+
+### What the geometry actually supports
+
+| | |
+|---|---|
+| bare four-leg circuits enumerated | **102** |
+| start/goal pairs over them | **10,540** |
+| true minimum turns, best case | **4** |
+| pairs at a true minimum of 5 | **0** |
+
+**No bare circuit requires 5 turns anywhere.** Augmentation is the only route
+past four, which is also the reason `crook-06` reaches six. Of the 262 augmented
+pairs that do require exactly 5:
+
+```
+require exactly 5 TRUE turns                          262
+goal standable, and so visible, at turn 0             150
+not doubling back on Y, not arm-04's base, no mirrors   6
+avatar not hidden behind its own figure                 3
+```
+
+The Y exclusion does most of the cutting and it is a design choice, not a
+correctness filter: `crook-06` is the only upright silhouette in the campaign and
+`ORDER` says so. The alternatives it discards are longer — 8 walks against
+`post-05`'s 5 — and **the campaign got shorter as a result**, from 79 optimal
+keypresses to 74. That is a real cost and the honest trade for a curve where
+every number is measured.
+
+### The second defect, which nothing was looking for
+
+`perch-05`'s goal was **not visible in the rotation the level opens in.** Its
+goal sits at (0,0,0), the circuit's closure point — and a closed circuit's far
+end aliases that point while sitting IN FRONT of it, so the goal is occluded at
+turn 0 and standable only in rotations 1-3. It was the only shipping level where
+that was true.
+
+Nothing could have caught it. The level is solvable, its premise is provable,
+the goal marker code is correct, and every pixel is reproducible. The level is
+fine and the PICTURE is wrong — the same shape of defect as P18's occluding bar,
+found the same way. `true-minturns.test.js` now asserts it for every campaign
+level.
+
+### The last filter was not computed, again
+
+Three of the six surviving candidates put the AVATAR behind the post at turn 0,
+and **no cell-level check sees it**: the occluding block sits at a different
+screen cell and covers only part of the pawn's rendered height, so
+`visibility()` reports the avatar's own screen cell as clear. A first draft of
+`post-05`'s docstring claimed a filter caught this. It did not; the plates did.
+That claim was removed before it shipped.
+
+### `post-05`
+
+A four-leg circuit doubling back on X with a two-cell post standing up from the
+near walkway. Five turns, measured. Five walks. Goal and avatar both visible at
+turn 0. The curve is now
+
+```
+0, 0, 1, 2, 3, 4, 5, 6      declared
+0, 0, 1, 2, 3, 4, 5, 6      measured
+```
+
+and `test/true-minturns.test.js` asserts `declared === exact` for **every** level
+with no exception pinned — which is what that test's own note demanded when the
+defect was closed. `perch-05` stays in the registry, off-campaign, with its
+declaration corrected from 5 to 3; a retired level with a false premise is still
+a false premise.
+
+### `search.mjs`, repaired
+
+- selects on `minTurnsExact`, not `turnsInRoute`;
+- requires the goal to be standable at turn 0;
+- rejects a spur that OCCLUDES the figure it is hung on (it had no such check —
+  the same omission that put an unusable figure at the top of `teach.mjs`'s
+  first shortlist);
+- and decides the turn target with one search BEFORE calling `premise()`, which
+  it used to call for every pair and discard. Premise mode went from over ten
+  minutes to **75 seconds**.
+
+### State
+
+227 tests, 20 gated shots, gate PASS. Eight levels, 74 optimal keypresses.
 
 ---
 
