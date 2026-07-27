@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Structure } from '../src/geometry/index.js';
+import { Structure, cellId } from '../src/geometry/index.js';
 import { LEVELS, ORDER } from '../src/world/levels.js';
 
 /**
@@ -53,47 +53,62 @@ test('minTurnsBetween never exceeds what findRoute actually achieved', () => {
 });
 
 /**
- * PINNED DEFECT, in the style this repo already uses for the hole detector.
+ * THE STRONGER CLAIM, which replaces the pinned defect rather than deleting it.
  *
- * `perch-05` declares 5 and requires 3. This is asserted rather than fixed
- * because closing it is a DESIGN decision, not a mechanical correction:
+ * This test used to read `PINNED: perch-05 declares more turns than it
+ * requires`, and its own note said: when this is fixed, replace it with
+ * `declared === exact` for every level, and do not delete it — because deleting
+ * it removes the only thing standing between the campaign curve and a number
+ * nobody measured.
  *
- *   - re-declaring it at 3 makes the curve 0,1,2,3,4,3,6, which is no longer
- *     non-decreasing and breaks what ORDER claims about the campaign;
- *   - no start/goal pair on perch-05 has a true minimum of 5 — searched
- *     exhaustively over all 18x17 pairs, and the highest the figure supports
- *     anywhere is 4 — so the level CANNOT honestly fill the 5 slot;
- *   - filling it needs a different figure, and P8 left 1,255 augmented shapes
- *     at exactly 4 turns and 104 at 5 unexplored in `tools/search.mjs`.
- *
- * WHEN THIS IS FIXED, THIS TEST MUST BE REPLACED WITH THE STRONGER CLAIM —
- * `declared === exact` for every level — and not deleted. Deleting it removes
- * the only thing standing between the campaign curve and a number nobody
- * measured.
+ * `perch-05` is fixed by replacement: it could not honestly fill the 5 slot (no
+ * start/goal pair on that figure has a true minimum above 4), so `post-05` took
+ * it. There is no exception left to pin.
  */
-test('PINNED: perch-05 declares more turns than it requires', () => {
-  const L = LEVELS['perch-05'];
-  const st = new Structure(L.cells);
-  const p = st.premise(L.start, L.goal);
-
-  assert.equal(declared('perch-05'), 5, 'perch-05 no longer declares 5 — re-derive this fixture');
-  assert.equal(p.turnsInRoute, 5, 'findRoute no longer returns the 5-turn tie-break');
-  assert.equal(p.minTurnsExact, 3,
-    'perch-05 true minimum moved. If it is now 5, the defect is FIXED — replace this test with ' +
-    'the stronger claim (declared === exact for every level) rather than deleting it.');
-});
-
-test('every OTHER level declares exactly its true minimum', () => {
-  // The stronger claim, already true everywhere except the pinned level. If
-  // perch-05 is ever fixed, fold it in here and delete the fixture above.
+test('EVERY level declares exactly its true minimum — no exceptions', () => {
+  const wrong = [];
   for (const name of ORDER) {
-    if (name === 'perch-05') continue;
     const d = declared(name);
     if (d == null) continue;
     const L = LEVELS[name];
     const exact = new Structure(L.cells).minTurnsBetween(L.start, L.goal);
-    assert.equal(exact, d,
-      `${name} declares minTurns ${d} but its true minimum is ${exact} — the campaign curve ` +
-      'is reporting a routing artifact, not the level');
+    if (exact !== d) wrong.push(`${name} declares ${d}, requires ${exact}`);
   }
+  assert.deepEqual(wrong, [],
+    'a level is reporting a routing artifact rather than its own difficulty. Do not ' +
+    'weaken this assertion to accommodate it — either re-aim the level or replace ' +
+    'the figure, which is what perch-05 needed.');
+});
+
+test('the campaign curve is non-decreasing in TRUE turns, not in declared ones', () => {
+  // The curve was 0,1,2,3,4,3,6 for four phases while every test passed, because
+  // campaign.test.js checks the DECLARED minTurns and the declaration was the
+  // thing that was wrong. Measuring it here closes that loop.
+  const exact = ORDER.map((n) => {
+    const L = LEVELS[n];
+    return new Structure(L.cells).minTurnsBetween(L.start, L.goal);
+  });
+  for (let i = 1; i < exact.length; i++) {
+    assert.ok(exact[i] >= exact[i - 1],
+      `${ORDER[i]} truly requires ${exact[i]} turns but ${ORDER[i - 1]} requires ` +
+      `${exact[i - 1]} — the curve goes backwards: [${exact.join(', ')}]`);
+  }
+});
+
+test('the goal is visible in the rotation the level opens in', () => {
+  // perch-05 shipped with an occluded goal and nothing noticed. Its goal sat at
+  // the circuit's closure point, and a closed circuit's far end aliases that
+  // point while sitting IN FRONT of it — so the marker drew nothing and the
+  // player was sent somewhere they could not see. It was the only level where
+  // that was true, and it is a property no premise assertion covers: the level
+  // is perfectly solvable, and the picture is what is wrong.
+  const blind = [];
+  for (const name of ORDER) {
+    const L = LEVELS[name];
+    const st = new Structure(L.cells);
+    const visible = st.standable(0).some((c) => cellId(...c) === cellId(...L.goal));
+    if (!visible) blind.push(name);
+  }
+  assert.deepEqual(blind, [],
+    'a campaign level opens with its goal hidden behind the figure');
 });

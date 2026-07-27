@@ -128,10 +128,19 @@ for (const d1 of DIRS) for (const d2 of DIRS) for (const d3 of DIRS) for (const 
  * the unlock and it is what the shipping levels already do: spur-01, span-02 and
  * shelf-03 are a bare tribar plus hung cells.
  *
- * The target is matched EXACTLY, not bounded. levels.test.js asserts
- * `turnsInRoute >= minTurns`, so a route taking six turns would satisfy a
- * `minTurns: 4` declaration and the campaign curve would be meaningless while
- * every test stayed green. See spec §5.1.
+ * THE TARGET IS `minTurnsExact`, AND IT USED TO BE `turnsInRoute`. THAT WAS THE
+ * BUG THAT SHIPPED perch-05.
+ *
+ * `turnsInRoute` is the turn count of whichever equally-short route BFS reached
+ * first — an arbitrary tie-break, not a minimum. Matching on it means this tool
+ * reports "shapes at exactly 5 turns" when what it has found is shapes whose
+ * tie-break happens to return 5. `perch-05` came out of this filter, declared 5,
+ * and required 3.
+ *
+ * So every count this tool has ever printed in premise mode — including the
+ * "1,255 shapes at 4 turns and 104 at 5" quoted in METHODOLOGY §P8 and §P16 —
+ * counted the wrong thing. They are not counts of figures that REQUIRE N turns.
+ * See METHODOLOGY §P20.
  */
 if (args.turns != null) {
   const TARGET = Number(args.turns);
@@ -157,14 +166,40 @@ if (args.turns != null) {
           // the read it was added to.
           if (s.enclosedHoles(0).length === 0) continue;
 
-          for (const from of s.standable(0)) {
+          // Nor may it HIDE the figure it is hung on. A spur placed at a screen
+          // position the base already occupies sits in front of it and replaces
+          // it in the picture, so the plate shows the base figure with a piece
+          // silently swapped out. Cheap, general, and this tool had no such
+          // check — see tools/teach.mjs, where the same omission put an
+          // unusable figure at the top of a shortlist.
+          const baseScreen = new Set(f.cellList.map((c) => screenId(...c)));
+          if (extra.some((c) => baseScreen.has(screenId(...c)))) continue;
+
+          // CHEAP CHECKS BEFORE THE EXPENSIVE ONE.
+          //
+          // `premise()` runs findRoute, four findPath, four impossibleEdges and
+          // two uniform-cost searches. It used to be called for EVERY pair and
+          // then discarded on the turn target, which almost every pair fails —
+          // so nearly all of that work was thrown away, and premise mode took
+          // over ten minutes. Deciding the target with one search first, and
+          // filtering goals to what is standable at turn 0, cuts the pairs that
+          // reach `premise()` to the handful that can survive it.
+          const standable0 = s.standable(0);
+          const standableIds = new Set(standable0.map((c) => cellId(...c)));
+          for (const from of standable0) {
             for (const to of cells) {
               if (cellId(...from) === cellId(...to)) continue;
+              // The goal must be standable in the rotation the level OPENS in,
+              // or the player is sent somewhere they cannot see. perch-05
+              // shipped without this: its goal sat at the circuit's closure
+              // point, which the far end of the circuit occludes at turn 0.
+              if (!standableIds.has(cellId(...to))) continue;
+              if (s.minTurnsBetween(from, to) !== TARGET) continue;
+
               const p = s.premise(from, to);
               if (!p.solvable || !p.requiresTurn || !p.usesIllusion) continue;
               if (p.flatSolvableTurns.length !== 0) continue;
               if (p.route?.[0]?.kind !== 'walk') continue;
-              if (p.turnsInRoute !== TARGET) continue;
               out.push({
                 figure: f.legs,
                 spur: `${d}×${len} from ${anchor.join(',')}`,
