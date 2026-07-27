@@ -250,27 +250,56 @@ if (cmd === 'gate') {
   const nControls = aliasKey.aliases.filter((a) => a.control).length;
 
   const byJudge = new Map();
+  const blank = (judge) => ({ judge, controls: 0, confabulated: 0, calls: [], real: 0, realSame: 0 });
   for (const v of verdicts) {
-    if (!isControl.get(v.pairId)) continue;
-    const j = byJudge.get(v.judge) ?? { judge: v.judge, controls: 0, confabulated: 0, calls: [] };
-    j.controls += 1;
-    if (String(v.choice).toLowerCase() !== 'same') { j.confabulated += 1; j.calls.push(v.pairId); }
+    if (!isControl.has(v.pairId)) continue;
+    const j = byJudge.get(v.judge) ?? blank(v.judge);
+    const same = String(v.choice).toLowerCase() === 'same';
+    if (isControl.get(v.pairId)) {
+      j.controls += 1;
+      if (!same) { j.confabulated += 1; j.calls.push(v.pairId); }
+    } else {
+      j.real += 1;
+      if (same) j.realSame += 1;
+    }
     byJudge.set(v.judge, j);
   }
 
   const judges = [...byJudge.values()].map((j) => ({
     ...j,
+    /**
+     * DISCRIMINATION, reported and NOT used to disqualify.
+     *
+     * The control catches a judge that invents differences. It is blind to the
+     * opposite failure — a judge that reports no difference anywhere passes it
+     * perfectly, because "same" everywhere is trivially self-consistent.
+     *
+     * Measured in the P14 multi-model panel: one model scored 8 or 9 on every
+     * frame in the set, including frames three other models called broken. It
+     * passed the duplicate control at d=0 and discriminated nothing.
+     *
+     * This is NOT a failure condition, and that is the whole subtlety: "same"
+     * on every real pair is also the CORRECT answer when the difference really
+     * is below threshold. The number distinguishes nothing on its own — it says
+     * where to look. A panel where every judge reports allSame has learned
+     * something about the stimulus; ONE judge doing it among several that did
+     * not has said something about the judge.
+     */
+    sameRate: j.real ? Number((j.realSame / j.real).toFixed(4)) : null,
+    allSame: j.real > 0 && j.realSame === j.real,
     // ANY confident call on an identical pair is a failure. Not a rate, not a
     // threshold — the images are the same file, so one is one too many.
     pass: j.confabulated === 0,
   })).sort((a, b) => a.judge < b.judge ? -1 : 1);
 
   const failed = judges.filter((j) => !j.pass).map((j) => j.judge);
+  const nonDiscriminating = judges.filter((j) => j.pass && j.allSame).map((j) => j.judge);
   const result = {
     controlsInPanel: nControls,
     judges,
     disqualified: failed,
     admitted: judges.filter((j) => j.pass).map((j) => j.judge),
+    nonDiscriminating,
     unknownPairIds: unknown,
   };
   console.log(JSON.stringify(result, null, 2));
@@ -281,6 +310,11 @@ if (cmd === 'gate') {
     console.error(`\nDISQUALIFIED: ${failed.join(', ')} — reported a difference between identical images. ` +
       'Exclude these judges before tallying; their verdicts are not weak evidence, they are none.');
     process.exit(1);
+  }
+  if (nonDiscriminating.length) {
+    console.error(`\nNOTE: ${nonDiscriminating.join(', ')} answered "same" on every real pair. ` +
+      'Not a failure — that is the correct answer if the difference is below threshold. But if other ' +
+      'judges discriminated on the same pairs, this one contributed nothing and should not be averaged in.');
   }
   console.error('\nOK: every judge answered "same" on every control. The panel can resolve what it was shown.');
   process.exit(0);

@@ -1724,6 +1724,99 @@ made on the merits.
 
 ---
 
+## P14 — the judge mattered more than the game
+
+**Completed 2026-07-27.** P12 ranked "a panel of genuinely different models" as
+the highest-priority grading item and recorded it as out of reach. It was not —
+subagents take a model parameter. One rubric prompt, **four different models**
+(Opus, Sonnet, Haiku, Fable), both art versions, HUD-free, identical frames.
+Raw data in `docs/grading/2026-07-27-p14-multi-model.json`.
+
+### The variance ladder, complete
+
+Every term below is the same stimulus judged differently:
+
+| what varies | magnitude |
+|---|---|
+| nothing — identical prompt, identical model | 0.14 |
+| the P10 ink re-key | 0.02 |
+| the HUD | 0.54 |
+| prompt wording, same model family | 2.12 |
+| **MODEL CHOICE** | **3.78** |
+
+Opus scored the set **4.44**. Haiku scored **the same pixels 8.22.** That is the
+distance from AMATEUR to SHIPPED, decided entirely by which model was asked.
+
+**Every absolute score this project has ever quoted is a property of its judge**,
+and the judge was never a controlled variable. 4.22, 6.34, 6.91 — all of them sit
+inside a 3.78-point band that opens purely on model selection.
+
+### The control fired, for the first time on a real run
+
+`sonnet` on art B scored the same image **7 and 3** — a delta of 4 on a duplicate
+pair — describing one as "fuller frame, more complex crossbar geometry" and the
+other as "player pawn is almost entirely hidden behind a pillar." Same file.
+Disqualified by the P11 gate before its numbers reached any average, which is
+exactly what that gate was built for. It is also, not coincidentally, the only
+model that produced a strongly negative art delta.
+
+### The two things worth more than the number
+
+**1. The most discriminating judge was the harshest, and the only one that found
+the real defects.** Opus scored lowest at 4.44 — and its notes, unprompted,
+named the exact P10 mechanisms: *"per-cube tonal banding down the red face"*,
+*"stray red/dark tick slivers along beam seams"*, *"bright-red edge sliver"*.
+That is `densityJitter` keyed per instance and `INK.ghost` clamping, identified
+from pixels by a judge that had never seen this document. It is also the only
+model whose art delta was positive (+0.56).
+
+**2. Haiku passed the control and discriminated nothing.**
+
+| model | mean | stdev across 9 shots | distinct scores used |
+|---|---|---|---|
+| opus | 4.44 | 1.17 | 3, 4, 5, 6 |
+| sonnet | 6.78 | 1.13 | 5, 6, 7, 8 |
+| fable | 6.89 | 0.87 | 5, 6, 7, 8 |
+| **haiku** | **8.22** | **0.42** | **8, 9** |
+
+Haiku gave 8 or 9 to every frame, including ones three other models called
+broken, and passed the duplicate control at **d=0**. Perfect self-consistency,
+near-zero information.
+
+**So the control has a second blind spot, opposite to P12's.** P12 found it
+cannot detect miscalibration. This finds it cannot detect *non-discrimination* —
+a judge that says the same thing about everything is trivially consistent.
+`gate` now reports `sameRate` and `allSame` per judge.
+
+That report deliberately does **not** disqualify, and the reason is the whole
+subtlety: "no difference anywhere" is also the CORRECT answer when the difference
+really is below threshold. The number does not decide anything by itself. A panel
+where *every* judge reports allSame has learned something about the stimulus; one
+judge doing it among several that did not has said something about the judge.
+
+### The P10 art change, fourth verdict
+
+Across gate-admitted models: opus **+0.56**, haiku **0.00**, fable **−0.33** —
+mean **+0.07**. A fourth independent instrument putting the ink re-key at
+approximately nothing.
+
+The dissent is worth recording rather than averaging away: **the single most
+discriminating judge in the panel is the only one that scored it better**, and it
+is the same judge that independently located the defects the change fixed. That
+is one observation, well inside its own noise, and it is not evidence. It is the
+only thread left that has not been cut.
+
+### Still open
+
+- Everything from P12 except the multi-model panel, which is now done and made
+  things worse rather than better.
+- If an absolute score is wanted at all, the panel must fix its model AND its
+  wording AND report both, and even then it compares only to itself.
+- `crook-06`'s playtest, `findRoute`'s equal cost, persistence, an ending,
+  `_emit`'s missing try/catch.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
