@@ -1267,6 +1267,136 @@ question Claude-of-Duty's critics actually answered, so the numbers compare.
 
 ---
 
+## P10 — the defects were the art direction
+
+**Completed 2026-07-26.** P9 ended by filing [issue #16](https://github.com/DelanoJoey/penrose/issues/16),
+"two confirmed rendering defects the pixel gate cannot express," and listing them
+under *Still open* above. Both were measured this phase. **Neither was a defect.**
+Both were constants in `src/render/index.js`, doing exactly what their docstrings
+said they would.
+
+### What they actually were
+
+| reported | is | evidence |
+|---|---|---|
+| "bright hairline slivers along bottom edges" | `INK.ghost` + `INK.ghostDropY` | 3861 red / 3072 blue ghost pixels; **99.6% / 99.5% have their own plate directly above**; median run 8px; **0** on the top plate, which is what a −Y drop predicts |
+| "tonal breaks mid-face at cube boundaries" | `INK.densityJitter`, documented as per-block | the red field is **9 flat plateaus**, not a gradient; top 12 tones cover **99.8%**; spread ch0 **235..247** against a predicted **235..247** |
+
+So the issue's two proposed checks were both unbuildable, and that is the more
+useful half of the finding:
+
+- **"no pixel carries a colour absent from the palette"** cannot fail. Every ink
+  is a multiplicative transform of a palette entry — in palette by construction.
+- **"sample face interiors for uniformity"** fails on *correct* output. Interiors
+  are deliberately non-uniform; that is what `densityJitter` is.
+
+The premise that a correctness check would have caught these does not hold,
+because there was nothing incorrect to catch. What is true is worse: **five
+independent lenses read the deliberate press-imperfection as breakage.** That is
+an art-direction failure, not a rendering one.
+
+### Two mechanisms, both measurable
+
+**The ghost clamped.** Not "too bright" — by luma it was already *darker* on all
+three plates (−21.6 / −11.0 / −9.3). The red channel at 1.15 drove two of three
+plates past full: `faceTop 255,181,17 -> 255,146,8` and
+`faceRight 241,80,96 -> 255,63,65`. A clamped channel stops being a denser pass
+of the same ink and becomes a saturated primary. **The eye was reading saturation
+and reporting brightness**, which is why the first diagnosis this phase produced —
+"the ghost is too bright, make it darker" — was wrong in its mechanism while
+right about the symptom. It was corrected by computing the values rather than
+describing them.
+
+**The density was keyed per instance.** `hash01(i)` is uncorrelated between
+neighbours, so every cube boundary carried the full amplitude as a step and every
+seam landed exactly on a geometry edge — which is precisely what makes variation
+read as rasterisation error instead of as ink.
+
+### What changed, and what it bought
+
+`ghost` `[1.15, 0.62, 0.45]` → `[0.86, 0.78, 0.70]`; density re-keyed from the
+instance index to a smooth 3D value-noise field (`valueNoise3`, new) sampled at
+the **unrotated cell**, wavelength 6 (`INK.densityWavelength`).
+
+| | before | after |
+|---|---|---|
+| ghost peak red, `hero` | **255 — clamped** | **230** |
+| ghost coverage, red plate | 3861 px | 3979 px |
+| adjacent-cell density step, **all 7 levels** | max **7**, mean 3.40–3.82 | max **2**, mean 0.45–0.87 |
+
+Coverage barely moves, so the misregistration still reads as clearly as it did —
+it just no longer reads as an error. Five variants were captured and looked at
+(`ghost` alone, smooth field alone, jitter off, and both combinations) before
+choosing; jitter-off removed the seams entirely and was rejected because it
+discards a stated pillar of the direction ("THE PRESS IS IMPERFECT").
+
+### The ceiling, which is structural
+
+`instanceColor` is one colour per instance and the cube geometry is shared across
+instances, so **density cannot vary within a cube** without a fragment-shader or
+per-vertex change — both blocked by the shared geometry and by the program-count
+budget. Seams can therefore be made quieter, never absent, at any wavelength that
+still leaves the structure varying at all. Past roughly 24 cells the effect is
+gone entirely. This is recorded because the obvious next move is to raise the
+wavelength further, and it does not work.
+
+### The check that can fail
+
+Issue #16 asked for a check that could have failed. `test/ink-invariance.test.js`
+is one, and it guards the invariant this change put at risk — density must be
+sampled at the unrotated cell, or a quarter turn reshuffles every block and the
+commit frame stops being pixel-identical. That invariant was asserted in a
+comment and covered by nothing.
+
+**Each of its three assertions was falsified before being trusted**, which is the
+step P8's audit found missing on three earlier "load-bearing" claims:
+
+| mutation | expected failure | result |
+|---|---|---|
+| sample the rotated position instead of the cell | invariance | ✅ failed, named the cause |
+| `densityWavelength` 6 → 0.35 | smoothness | ✅ failed, `0.734 of full amplitude` |
+| restore `ghost` red to 1.15 | clamp | ✅ failed, `faceTop channel 0 to 1.213` |
+
+The smoothness test carries its own negative control — it reconstructs the old
+uncorrelated keying and asserts it is *worse* — because without one it would pass
+on a constant field and measure nothing.
+
+`INK.knockout` is deliberately exempt from the clamp assertion: it is
+`[1.60, 1.50, 1.35]` and clamps on purpose, because a knockout is meant to blow
+out. Asserting the rule only where it applies is what makes it a check rather
+than a lint.
+
+### Verification
+
+| check | result |
+|---|---|
+| unit tests | **184 pass, 0 fail** (181 + 3) |
+| determinism gate | **PASS** — two captures pixel-identical |
+| `analyze.mjs crook-06` | OK, routing premise unaffected |
+| full capture | **18/18 shots**, 0 errors — count checked, per P8's false-green |
+| before/after diff | 18 rows, **0 missing**, `identical: false` as intended; maxDelta 25–35 |
+
+### Corrected here
+
+- **`shots/ref/` is gitignored** (`.gitignore:4`, `shots/*/`); only
+  `shots/.gitkeep` is tracked. This repository has **no committed reference set**
+  — the gate is purely self-consistency, so an intentional art change cannot
+  break CI and there is no reference commit to make. Planning for one was an
+  error, caught by trying to do it.
+
+### Still open
+
+- **The blind A/B is prepared but not judged.** `tools/grade.mjs prepare` built an
+  18-pair package, `worstSkew: 0`, pairIds neutralised. It has no verdicts,
+  because the only party available to judge it is the one that made the change.
+  A verdict from a judge who knows which side is which is not a measurement.
+- Everything in P9's *Still open* except the two "defects", which are resolved as
+  non-defects rather than fixed: the HUD re-grade, a stronger panel, `crook-06`'s
+  55% rotations, persistence, an ending, the `-1` orbit, `_emit`'s missing
+  try/catch.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted
