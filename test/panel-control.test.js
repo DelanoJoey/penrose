@@ -196,3 +196,41 @@ test('key.json keeps the blind-panel shape so tally is unaffected', () => {
   assert.ok(existsSync(join(out, 'alias-key.json')));
   rmSync(f.dir, { recursive: true, force: true });
 });
+
+test('gate reports a non-discriminating judge without disqualifying it', () => {
+  /**
+   * The mirror of the control's blind spot, found in the P14 multi-model panel:
+   * one model scored 8 or 9 on every frame in the set, including frames three
+   * other models called broken. It passed the duplicate control at d=0 and
+   * discriminated nothing — perfect self-consistency, zero information.
+   *
+   * "same" everywhere must NOT be a failure, because it is also the correct
+   * answer when the difference genuinely is below threshold. So this asserts it
+   * is REPORTED and still ADMITTED.
+   */
+  const f = fixture();
+  const { out } = prepare(f, ['--controls=2']);
+  const key = JSON.parse(readFileSync(join(out, 'alias-key.json'), 'utf8'));
+
+  const rows = key.aliases.flatMap((a) => ([
+    // says "same" to absolutely everything
+    { pairId: a.alias, judge: 'flat', choice: 'same' },
+    // actually discriminates on the real pairs
+    { pairId: a.alias, judge: 'sharp', choice: a.control ? 'same' : 'left' },
+  ]));
+  const r = run(['gate', `--dir=${out}`, `--verdicts=${verdictsFile(f.dir, rows)}`]);
+
+  assert.equal(r.code, 0, `gate failed an honest panel: ${r.err}`);
+  const res = JSON.parse(r.out);
+  assert.deepEqual(res.disqualified, [], 'answering "same" everywhere must not disqualify');
+  assert.ok(res.admitted.includes('flat'), 'the flat judge must still be admitted');
+  assert.deepEqual(res.nonDiscriminating, ['flat'], 'the flat judge was not reported');
+
+  const flat = res.judges.find((j) => j.judge === 'flat');
+  const sharp = res.judges.find((j) => j.judge === 'sharp');
+  assert.equal(flat.sameRate, 1, 'sameRate should be 1 for a judge that never picks a side');
+  assert.equal(sharp.sameRate, 0, 'sameRate should be 0 for a judge that always picks a side');
+  assert.equal(sharp.allSame, false);
+  assert.match(r.err, /answered "same" on every real pair/);
+  rmSync(f.dir, { recursive: true, force: true });
+});

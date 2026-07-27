@@ -1,0 +1,186 @@
+{
+ "panel": "p14-multi-model",
+ "design": "one rubric prompt, four DIFFERENT models, both art versions, HUD-free, identical frames",
+ "art": {
+  "A": "pre-P10 (3b271db)",
+  "B": "post-P10 ink re-key"
+ },
+ "models": [
+  "fable",
+  "haiku",
+  "opus",
+  "sonnet"
+ ],
+ "key": [
+  {
+   "alias": "frame-01",
+   "shot": "wide",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-02",
+   "shot": "arm04",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-03",
+   "shot": "wide",
+   "duplicate": true
+  },
+  {
+   "alias": "frame-04",
+   "shot": "seam",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-05",
+   "shot": "hero",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-06",
+   "shot": "arm04",
+   "duplicate": true
+  },
+  {
+   "alias": "frame-07",
+   "shot": "crook06",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-08",
+   "shot": "avatarmid",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-09",
+   "shot": "offaxis",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-10",
+   "shot": "perch05",
+   "duplicate": false
+  },
+  {
+   "alias": "frame-11",
+   "shot": "rot1",
+   "duplicate": false
+  }
+ ],
+ "scores": {
+  "opus": {
+   "A": {
+    "frame-01": 5,
+    "frame-02": 4,
+    "frame-03": 5,
+    "frame-04": 3,
+    "frame-05": 6,
+    "frame-06": 4,
+    "frame-07": 3,
+    "frame-08": 5,
+    "frame-09": 3,
+    "frame-10": 6,
+    "frame-11": 5
+   },
+   "B": {
+    "frame-01": 5,
+    "frame-02": 5,
+    "frame-03": 5,
+    "frame-04": 5,
+    "frame-05": 6,
+    "frame-06": 5,
+    "frame-07": 4,
+    "frame-08": 5,
+    "frame-09": 5,
+    "frame-10": 6,
+    "frame-11": 4
+   }
+  },
+  "sonnet": {
+   "A": {
+    "frame-01": 7,
+    "frame-02": 7,
+    "frame-03": 7,
+    "frame-04": 5,
+    "frame-05": 8,
+    "frame-06": 7,
+    "frame-07": 6,
+    "frame-08": 5,
+    "frame-09": 7,
+    "frame-10": 8,
+    "frame-11": 8
+   },
+   "B": {
+    "frame-01": 6,
+    "frame-02": 7,
+    "frame-03": 6,
+    "frame-04": 5,
+    "frame-05": 7,
+    "frame-06": 3,
+    "frame-07": 7,
+    "frame-08": 7,
+    "frame-09": 5,
+    "frame-10": 7,
+    "frame-11": 5
+   }
+  },
+  "haiku": {
+   "A": {
+    "frame-01": 8,
+    "frame-02": 8,
+    "frame-03": 8,
+    "frame-04": 9,
+    "frame-05": 8,
+    "frame-06": 8,
+    "frame-07": 8,
+    "frame-08": 9,
+    "frame-09": 8,
+    "frame-10": 8,
+    "frame-11": 8
+   },
+   "B": {
+    "frame-01": 8,
+    "frame-02": 8,
+    "frame-03": 8,
+    "frame-04": 9,
+    "frame-05": 8,
+    "frame-06": 8,
+    "frame-07": 9,
+    "frame-08": 8,
+    "frame-09": 8,
+    "frame-10": 8,
+    "frame-11": 8
+   }
+  },
+  "fable": {
+   "A": {
+    "frame-01": 6,
+    "frame-02": 8,
+    "frame-03": 6,
+    "frame-04": 7,
+    "frame-05": 7,
+    "frame-06": 8,
+    "frame-07": 5,
+    "frame-08": 7,
+    "frame-09": 7,
+    "frame-10": 8,
+    "frame-11": 7
+   },
+   "B": {
+    "frame-01": 7,
+    "frame-02": 7,
+    "frame-03": 7,
+    "frame-04": 6,
+    "frame-05": 7,
+    "frame-06": 7,
+    "frame-07": 6,
+    "frame-08": 7,
+    "frame-09": 6,
+    "frame-10": 7,
+    "frame-11": 6
+   }
+  }
+ },
+ "gate": "sonnet/artB FAILED the duplicate control: scored the same image 7 and 3"
+}
