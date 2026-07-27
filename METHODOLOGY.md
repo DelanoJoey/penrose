@@ -1384,12 +1384,74 @@ than a lint.
   break CI and there is no reference commit to make. Planning for one was an
   error, caught by trying to do it.
 
-### Still open
+### The blind A/B, and why its headline number is not quotable
 
-- **The blind A/B is prepared but not judged.** `tools/grade.mjs prepare` built an
-  18-pair package, `worstSkew: 0`, pairIds neutralised. It has no verdicts,
-  because the only party available to judge it is the one that made the change.
-  A verdict from a judge who knows which side is which is not a measurement.
+18 pairs, five differentiated lenses, `worstSkew: 0`, pairIds neutralised, key
+withheld in a directory judges were forbidden to read. Raw data in
+`docs/grading/2026-07-26-p10-*`.
+
+The composites were rebuilt as full-view-over-detail before judging. Judging two
+1600×1000 plates side by side would have handed the panel an instrument that
+cannot resolve an 8px hairline or a 2-byte-level seam — P9's critics only caught
+these at 3×. The magnified strip uses the same region on both sides, chosen from
+the left half's ink, so the crop cannot favour a side.
+
+| | wins | rate | CI95 | exactP | verdict |
+|---|---|---|---|---|---|
+| raw, 5 judges | 64/90 | 71.1% | 0.610–0.795 | 0.000077 | better |
+| effective, 4 judges | 46/72 | 63.9% | 0.524–0.740 | 0.024 | better |
+
+**`tally` exits 1 on both.** Mean pairwise agreement is 0.578 raw / 0.537
+effective, and `problemsWith` correctly refuses to certify: *"the panel is not
+detecting a shared signal, so these win rates are noise however decisive they
+look."* **Do not quote 71.1%.** Position bias was clean — leftRate exactly 0.500.
+
+The per-judge decomposition is the actual finding:
+
+| lens | prefers the change | notes cite |
+|---|---|---|
+| edge-quality | **18/18** | measured pixel values — "peaks at R254 … brighter than the flat pink itself" |
+| colour-coherence | **18/18** | measured — "H≈359° vs 354–356°, S≈75% vs ≈67% … outside the ink set" |
+| surface | 11/18 | qualitative |
+| print-authenticity | 10/18 | qualitative |
+| storefront | **7/18 — against** | qualitative |
+
+The two lenses that reached 100% both independently resorted to **measuring the
+pixels**, and both described the clamp without being told it existed. They were
+prompted differently and agreed 18/18, which is why the effective tally collapses
+them to one judge — the inverse of P9's error, where five near-identical judges
+inflated `n`.
+
+The three qualitative lenses were not detecting the stimulus at all, and they can
+be shown not to have been:
+
+- **storefront** justified its picks with "tighter corner joint", "better
+  proportioned", "more balanced spacing", "avatar reads as anchored rather than
+  floating". The two sides are **pixel-identical in geometry** — only ink differs.
+  Every one of those differences is impossible.
+- **print-authenticity** cited "shading depth", "gradation", "blends smoothly".
+  This renderer has **no lighting term at all** (`src/render/index.js:6-8`). There
+  is no shading to grade.
+
+So the near-chance agreement is not evidence that the change did nothing. It is
+evidence that **three of five lenses could not resolve the difference and
+narrated instead**, and their noise swamps the two that could. Mean pairwise
+agreement summarises a panel on the assumption that every judge is a noisy
+sampler of one latent quality; it is the wrong statistic for a panel where some
+judges measured and others guessed.
+
+That cuts both ways and the honest position is the conservative one: **this A/B
+did not produce a certified perceptual win.** What stands without it is the
+objective half — the clamp is gone (peak red 255 → 230) and the seam dropped from
+7 to 2 byte levels — and neither of those depends on anyone's taste.
+
+**A lens that confabulates impossible differences is a broken instrument, not a
+weak one.** P9 already flagged that five instances of one model is a weak panel.
+This adds the sharper version: a lens must be shown capable of resolving the
+stimulus before its verdict counts, and that capability is cheap to test —
+give it a difference it cannot possibly see and check whether it reports one.
+
+### Still open
 - Everything in P9's *Still open* except the two "defects", which are resolved as
   non-defects rather than fixed: the HUD re-grade, a stronger panel, `crook-06`'s
   55% rotations, persistence, an ending, the `-1` orbit, `_emit`'s missing

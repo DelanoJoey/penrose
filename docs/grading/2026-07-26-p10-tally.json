@@ -1,0 +1,119 @@
+{
+  "candidates": [
+    {
+      "name": "variant-a",
+      "wins": 64,
+      "n": 90,
+      "winRate": 0.7111,
+      "ci95": {
+        "lower": 0.6104,
+        "upper": 0.7946,
+        "width": 0.1842,
+        "method": "wilson",
+        "z": 1.96
+      },
+      "exactP": 0.000077,
+      "verdict": "better"
+    }
+  ],
+  "positionBias": {
+    "leftPicks": 45,
+    "total": 90,
+    "leftRate": 0.5,
+    "suspect": false
+  },
+  "agreement": {
+    "judges": [
+      "colour-coherence",
+      "edge-quality",
+      "print-authenticity",
+      "storefront",
+      "surface"
+    ],
+    "pairwise": [
+      {
+        "judges": [
+          "colour-coherence",
+          "edge-quality"
+        ],
+        "overlap": 18,
+        "agreement": 1
+      },
+      {
+        "judges": [
+          "colour-coherence",
+          "print-authenticity"
+        ],
+        "overlap": 18,
+        "agreement": 0.5556
+      },
+      {
+        "judges": [
+          "colour-coherence",
+          "storefront"
+        ],
+        "overlap": 18,
+        "agreement": 0.3889
+      },
+      {
+        "judges": [
+          "colour-coherence",
+          "surface"
+        ],
+        "overlap": 18,
+        "agreement": 0.6111
+      },
+      {
+        "judges": [
+          "edge-quality",
+          "print-authenticity"
+        ],
+        "overlap": 18,
+        "agreement": 0.5556
+      },
+      {
+        "judges": [
+          "edge-quality",
+          "storefront"
+        ],
+        "overlap": 18,
+        "agreement": 0.3889
+      },
+      {
+        "judges": [
+          "edge-quality",
+          "surface"
+        ],
+        "overlap": 18,
+        "agreement": 0.6111
+      },
+      {
+        "judges": [
+          "print-authenticity",
+          "storefront"
+        ],
+        "overlap": 18,
+        "agreement": 0.5
+      },
+      {
+        "judges": [
+          "print-authenticity",
+          "surface"
+        ],
+        "overlap": 18,
+        "agreement": 0.7222
+      },
+      {
+        "judges": [
+          "storefront",
+          "surface"
+        ],
+        "overlap": 18,
+        "agreement": 0.4444
+      }
+    ],
+    "meanPairwiseAgreement": 0.5778,
+    "nearChance": true
+  },
+  "unknownPairIds": []
+}

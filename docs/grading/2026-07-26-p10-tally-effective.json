@@ -1,0 +1,86 @@
+{
+  "candidates": [
+    {
+      "name": "variant-a",
+      "wins": 46,
+      "n": 72,
+      "winRate": 0.6389,
+      "ci95": {
+        "lower": 0.5235,
+        "upper": 0.7402,
+        "width": 0.2167,
+        "method": "wilson",
+        "z": 1.96
+      },
+      "exactP": 0.024461,
+      "verdict": "better"
+    }
+  ],
+  "positionBias": {
+    "leftPicks": 36,
+    "total": 72,
+    "leftRate": 0.5,
+    "suspect": false
+  },
+  "agreement": {
+    "judges": [
+      "edge-quality",
+      "print-authenticity",
+      "storefront",
+      "surface"
+    ],
+    "pairwise": [
+      {
+        "judges": [
+          "edge-quality",
+          "print-authenticity"
+        ],
+        "overlap": 18,
+        "agreement": 0.5556
+      },
+      {
+        "judges": [
+          "edge-quality",
+          "storefront"
+        ],
+        "overlap": 18,
+        "agreement": 0.3889
+      },
+      {
+        "judges": [
+          "edge-quality",
+          "surface"
+        ],
+        "overlap": 18,
+        "agreement": 0.6111
+      },
+      {
+        "judges": [
+          "print-authenticity",
+          "storefront"
+        ],
+        "overlap": 18,
+        "agreement": 0.5
+      },
+      {
+        "judges": [
+          "print-authenticity",
+          "surface"
+        ],
+        "overlap": 18,
+        "agreement": 0.7222
+      },
+      {
+        "judges": [
+          "storefront",
+          "surface"
+        ],
+        "overlap": 18,
+        "agreement": 0.4444
+      }
+    ],
+    "meanPairwiseAgreement": 0.537,
+    "nearChance": true
+  },
+  "unknownPairIds": []
+}
