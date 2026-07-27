@@ -1,0 +1,131 @@
+{
+  "seed": "inkrekey",
+  "pairs": [
+    {
+      "pairId": "variant-a--arm04",
+      "candidate": "variant-a",
+      "item": "arm04",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--avatar",
+      "candidate": "variant-a",
+      "item": "avatar",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--avatarmid",
+      "candidate": "variant-a",
+      "item": "avatarmid",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--crook06",
+      "candidate": "variant-a",
+      "item": "crook06",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--hero",
+      "candidate": "variant-a",
+      "item": "hero",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--offaxis",
+      "candidate": "variant-a",
+      "item": "offaxis",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--orbitlate",
+      "candidate": "variant-a",
+      "item": "orbitlate",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--orbitmid",
+      "candidate": "variant-a",
+      "item": "orbitmid",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--perch05",
+      "candidate": "variant-a",
+      "item": "perch05",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--rot1",
+      "candidate": "variant-a",
+      "item": "rot1",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--rot2",
+      "candidate": "variant-a",
+      "item": "rot2",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--rot3",
+      "candidate": "variant-a",
+      "item": "rot3",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--seam",
+      "candidate": "variant-a",
+      "item": "seam",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--shelf03",
+      "candidate": "variant-a",
+      "item": "shelf03",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    },
+    {
+      "pairId": "variant-a--span02",
+      "candidate": "variant-a",
+      "item": "span02",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--spur01",
+      "candidate": "variant-a",
+      "item": "spur01",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--stepmid",
+      "candidate": "variant-a",
+      "item": "stepmid",
+      "candidateSide": "right",
+      "referenceSide": "left"
+    },
+    {
+      "pairId": "variant-a--wide",
+      "candidate": "variant-a",
+      "item": "wide",
+      "candidateSide": "left",
+      "referenceSide": "right"
+    }
+  ]
+}
