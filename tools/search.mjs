@@ -145,6 +145,14 @@ for (const d1 of DIRS) for (const d2 of DIRS) for (const d3 of DIRS) for (const 
 if (args.turns != null) {
   const TARGET = Number(args.turns);
   const SPUR_MAX = Number(args['spur-max'] ?? 3);
+  /**
+   * Require the pair to contain at least N forks -- positions where two
+   * neighbours each strictly reduce the remaining walks, so the player must
+   * pick. The shipping campaign has ONE across all eight levels, and turn
+   * count does not predict it, so this is the axis the level pool has never
+   * been selected on. Off by default: 0 leaves every existing count unchanged.
+   */
+  const MIN_FORKS = Number(args['min-forks'] ?? 0);
   const out = [];
 
   for (const f of hits) {
@@ -195,6 +203,15 @@ if (args.turns != null) {
               // point, which the far end of the circuit occludes at turn 0.
               if (!standableIds.has(cellId(...to))) continue;
               if (s.minTurnsBetween(from, to) !== TARGET) continue;
+
+              // After the turn target, before premise(). The cascade stays
+              // cheap-first -- §P20 repaired exactly that ordering, taking
+              // premise mode from over ten minutes to 75 seconds, and a filter
+              // placed above minTurnsBetween would undo it.
+              if (MIN_FORKS > 0) {
+                const b = s.branching(from, to);
+                if (!b || b.forks < MIN_FORKS) continue;
+              }
 
               const p = s.premise(from, to);
               if (!p.solvable || !p.requiresTurn || !p.usesIllusion) continue;
