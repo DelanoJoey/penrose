@@ -22,6 +22,74 @@
  * (+1,+1), (0,-2), (-1,+1) — so the screen path is a genuine triangle that
  * closes, rather than a line walked twice.
  */
+/**
+ * THE SECOND TEACHING LEVEL — the one that teaches *rotate mid-route*.
+ *
+ * WHY IT EXISTS. Two of the campaign's levels are solvable in a standing view:
+ * pick a rotation, walk to the goal, never rotate again. From `spur-01` on,
+ * none are — the route must be interrupted, rotated and resumed. Nothing
+ * taught that. `teach-00` gives screen-adjacency an entire level; interleaved
+ * rotation simply became mandatory at level three and stayed mandatory, and a
+ * player who built the mechanic stopped on level four with nine moves spent on
+ * a level whose par is eight. See docs/playtest/OBSERVATIONS.md.
+ *
+ * HOW IT TEACHES. The start has NO legal walk, so `src/ui` shows "nothing to
+ * walk to, rotate" on frame one — the game stating the lesson in words, on a
+ * state the rest of the campaign visits ten times in 358 positions and never on
+ * a route anybody walks.
+ *
+ * That state can ONLY be a start. Screen adjacency is symmetric, so a cell
+ * reached on foot always has at least the way back, and the hint fires only at
+ * zero legal walks (`elRotateHint.hidden = legal.length > 0`). A level that
+ * walks the player into a wall is not merely undiscovered — it cannot exist.
+ *
+ * BOTH quarter turns open a walk, and that filter was added after looking at
+ * plates. An earlier shortlist leader opened in one direction only, and pressed
+ * the other way it is pixel-identical to the dead state it started in — still
+ * saying "nothing to walk to, rotate". A first rotation that changes nothing
+ * teaches that rotating does not help, which is the opposite of the lesson,
+ * taught more convincingly than the level teaches the truth.
+ *
+ * After the turn the route is FORCED — one legal walk at each step, eight of
+ * them, to the goal. `span-02` is what happens without that: zero forks, a
+ * maximum degree of two, and a player who cannot tell being stuck from being
+ * wrong. Here there is nothing to get wrong, so the only thing the level can
+ * teach is the thing it is for.
+ */
+function teach01() {
+  return {
+    name: 'teach-01',
+    cells: [
+      [0, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0],
+      [0, 3, -1], [0, 3, -2],
+      [1, 3, -2], [2, 3, -2], [3, 3, -2],
+      [3, 3, -1], [3, 3, 0], [3, 3, 1], [3, 3, 2], [3, 3, 3],
+      [0, 4, -2],
+    ],
+    start: [0, 4, -2],
+    goal: [3, 3, 3],
+    /**
+     * openWithWalk is FALSE, and it is the only level that declares so.
+     * `tools/analyze.mjs` calls a route that opens with a turn "unplayable on
+     * frame one", which is right for every other level and is precisely the
+     * point of this one: the first input must be a rotation, and the HUD says
+     * so before the player presses anything.
+     */
+    premise: { turn: true, illusion: true, par: 8, minTurns: 1, openWithWalk: false },
+    /**
+     * The properties that make this a TEACHING level rather than a solvable
+     * one, declared so test/teaching-rotation.test.js can measure them. Each is
+     * something a later edit could quietly destroy while leaving the level
+     * solvable and every other test green.
+     */
+    teaches: {
+      stranded: [0, 4, -2],   // start: no legal walk in the opening view
+      opens: 2,               // quarter turns that open one, out of two
+      runUp: 8,               // forced walks to the goal after the turn
+    },
+  };
+}
+
 function loop01(n = 5) {
   const cells = [];
 
@@ -378,6 +446,7 @@ function crook06() {
 
 export const LEVELS = {
   'teach-00': teach00(),
+  'teach-01': teach01(),
   'loop-01': loop01(),
   'probe-01': probe01(),
   'spur-01': spur01(),
@@ -466,6 +535,11 @@ export const DEFAULT_LEVEL = 'teach-00';
  */
 export const ORDER = [
   'teach-00',                                    // tribar 4 + a detached bar
-  'loop-01', 'spur-01', 'span-02', 'shelf-03',   // tribar, sizes 5/3/4/5
+  'loop-01',                                     // tribar 5, the bare figure
+  // teach-01 sits here, before the first level that REQUIRES a mid-route
+  // rotation. spur-01 onward cannot be solved from any standing view, and
+  // until now nothing said so.
+  'teach-01',
+  'spur-01', 'span-02', 'shelf-03',              // tribar, sizes 3/4/5
   'arm-04', 'post-05', 'crook-06',               // four-leg doubled-back circuit
 ];

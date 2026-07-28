@@ -345,6 +345,19 @@ export function makeShots(ctx) {
      */
     teach00: Object.assign(plate(0, { fillY: 0.70, fillX: 0.80, liftY: 0.02 }),
       { level: 'teach-00' }),
+
+    /**
+     * The rotation lesson, in the view it opens in — the one that matters.
+     *
+     * This is the frame where the level does its work: the avatar on a cell
+     * with no legal walk, the goal visible on a different arm, and src/ui
+     * saying "nothing to walk to, rotate". Everything after it is an ordinary
+     * forced corridor. Captured at the live framing fill so the plate is the
+     * picture a player actually gets, rather than a composition only the gate
+     * ever sees.
+     */
+    teach01: Object.assign(plate(0, { fillY: 0.70, fillX: 0.80, liftY: 0.02 }),
+      { level: 'teach-01' }),
   };
 
   /**

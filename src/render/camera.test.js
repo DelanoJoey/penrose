@@ -624,12 +624,13 @@ test('NEGATIVE CONTROL — the opening framing does not fit the other views', ()
       }
     }
   });
-  // ALL 24, not 23. Two different measurements, and it is worth keeping them
-  // apart: 23 of 24 rotated views fell OUTSIDE the old frustum, which is the
-  // clipping. All 24 need a DIFFERENT frustum or target, which is the
-  // composition. `post-05` view 4/4 is the one that stayed in frame while still
-  // being framed for a picture that had moved.
-  assert.equal(differ.length, 24,
+  // ALL of them, not 23 of 24. Two different measurements, worth keeping
+  // apart: at the time of the fix, 23 of the 24 rotated views fell OUTSIDE the
+  // old frustum, which is the clipping; all 24 needed a DIFFERENT frustum or
+  // target, which is the composition. `post-05` view 4/4 was the one that
+  // stayed in frame while still being framed for a picture that had moved.
+  // Counted from ORDER so adding a level does not silently weaken this.
+  assert.equal(differ.length, ORDER.length * 3,
     `every rotated view should need its own framing, got ${differ.length}`);
 });
 

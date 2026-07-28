@@ -185,10 +185,21 @@ for (const base of figures()) {
       if ((graphs[0].get(sid) ?? []).length !== 0) continue;
       stage.deadEnd += 1;
 
-      // A quarter turn must open a walk. Prefer exactly one so the lesson has a
-      // single correct response rather than two equivalent ones.
+      /**
+       * BOTH quarter turns must open a walk, and this filter was added after
+       * looking at plates.
+       *
+       * The first draft accepted a single opening direction, on the reasoning
+       * that one correct response is a cleaner lesson than two. Rendered, that
+       * is exactly backwards: `rc-03` pressed the other way is pixel-identical
+       * to the dead state it started in, still showing "nothing to walk to,
+       * rotate". A player whose first rotation changes nothing they can act on
+       * learns that rotating does not help — which is the opposite of the one
+       * thing this level exists to teach, taught more convincingly than the
+       * level teaches the truth.
+       */
       const opens = [1, 3].filter((t) => (graphs[t].get(sid) ?? []).length > 0);
-      if (opens.length === 0) continue;
+      if (opens.length < 2) continue;
       stage.rotationOpens += 1;
 
       /**
