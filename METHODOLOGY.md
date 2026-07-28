@@ -2637,6 +2637,137 @@ actually did, which nobody has yet: `docs/playtest/PROTOCOL.md` fixes four
 hypotheses and their falsification conditions in advance, and the next action is
 a fresh player in front of it.
 
+### Postscript — somebody played it the same day, and stopped at level 4
+
+Recorded in full in `docs/playtest/OBSERVATIONS.md`. Not a protocol session, so
+H1 is still untested. What it established:
+
+**Two of the eight levels are solvable in a standing view.** From `spur-01`
+onward, no rotation of the figure lets a player walk start-to-goal — the route
+must be interrupted, rotated mid-way and resumed. The declared curve
+`0,0,1,2,3,4,5,6` counts turns, so it reads as a ramp; what actually happens is
+one step change at level 3, from *walk* to *walk, rotate, walk*, and **nothing
+teaches it.** `teach-00` gives screen-adjacency an entire level; interleaved
+rotation just becomes mandatory and stays mandatory.
+
+That is the defect P18 closed, one level up, found the same way — by somebody
+playing. It is worth noticing that P21 built an instrument for exactly this and
+the finding arrived before the instrument was used; the instrument is still
+right, and the lesson from §P17 holds twice over.
+
+**And it is not difficulty.** `span-02`, where play stopped, has **zero forks**
+and a maximum degree of 2. There is no decision in it to get wrong. So a
+rotation teaching level ranks ahead of more content: six of eight levels already
+require the untaught skill, and more levels of the same kind multiply the
+opacity rather than the challenge.
+
+---
+
+## P22 — the framing never followed the rotation, and the second rule nothing taught
+
+**Completed 2026-07-28.** P21 built the instruments and said the next action was
+a play-test. Somebody played it the same day and stopped on level four, which
+made both of this phase's findings before any protocol was run.
+
+### The camera was composed once and never again
+
+`frameCells` ran on `level/loaded`, from `level.cells` — the UNROTATED positions
+— and nothing recomposed after a quarter turn. Six of the eight campaign levels
+cannot be solved without rotating, so six of eight put the player in a view
+nothing had ever composed.
+
+| | |
+|---|---|
+| rotated views that fell OUTSIDE their own frustum | **23 of 24** |
+| rotated views that needed a different framing | **24 of 24** |
+
+`span-02` at view 2/4 ran off the top of the frame. That is the level play
+stopped on, and the player was rotating to see what connected to what.
+
+**The gate could not have caught it, by construction.** `rot1`, `rot2` and
+`rot3` each call `frameCells` themselves before capturing, so they photograph
+every rotation with a camera recomposed for that rotation — one live play never
+had. They prove the rotated FIGURE renders and are blind to the rotated
+FRAMING. The fix moves **zero** gated pixels, which is the same fact stated from
+the other side.
+
+That is now four instruments in three phases that measured something adjacent to
+what ships: §P17's panels missed that the game was unreadable, §P21's gate could
+not see the frame-rate coupling, and these shots cannot see the framing.
+
+### The obvious fix costs half the artwork, and was rejected on measurement
+
+Fitting one frustum to all four rotations removes the clipping and draws every
+figure **1.5x to 2.2x smaller**, because `rotateY` turns about the world origin
+and the figures do not sit on it, so a fixed frustum has to hold the whole
+sweep. Measured across the campaign before it was discarded.
+
+What shipped instead uses the identity the end-swap already rests on:
+
+```
+image(A(P), world T) === image(P, world T+1)
+```
+
+Travelling from `start` to `A(end)` while the world still shows T, then
+restoring to `end` as the world becomes T+1, is continuous at both ends exactly
+as travelling to `A(start)` was. The old behaviour is the special case
+`end === start`, which is what a dev shot's orbit still gets — and is why the
+gate is unmoved. `span-02`'s opening view is byte-identical to before the change;
+views 2 to 4 are now composed at full size.
+
+### `teach-01`
+
+Two levels were solvable in a standing view. From `spur-01` on, none are, and
+nothing taught the difference. The declared curve counts turns so it read as a
+ramp; the demand stepped once, hard, at level three.
+
+**The state that teaches it can only be a start.** `src/ui` says "nothing to
+walk to, rotate" exactly at zero legal walks, and screen adjacency is symmetric
+— so a cell reached on foot always keeps the way back and can never have zero.
+A level that walks the player into a wall is not undiscovered, it is impossible,
+and the first version of the search spent its time looking for one.
+
+**Both quarter turns must open a walk**, which came from plates and not from
+reasoning. A shortlist leader that opened one way only is, pressed the other way,
+pixel-identical to the dead state it started in — still showing the same prompt.
+A first rotation that changes nothing teaches that rotating does not help, more
+convincingly than the level teaches the truth. That filter cut 2,304 candidates
+to **8**.
+
+After the turn the route is forced, eight walks to the goal. `span-02` is what
+happens without that: zero forks, maximum degree two, and a player who cannot
+tell being stuck from being wrong.
+
+### The mutation round that proved nothing
+
+The first run against the camera fix reported five of five caught. All five were
+invalid: the script restores with `git checkout`, the work was **uncommitted**,
+and the first restore deleted the implementation — so every later "failure" was
+the new tests failing against methods that no longer existed. The implementation
+had to be rebuilt from scratch.
+
+The rule this project already had was "restore in `finally`". The rule it needed
+is **commit before mutation testing**, because `git checkout` is only a restore
+if the work is in git.
+
+Re-run honestly, two mutants survived: reverting `level/loaded` to frame the
+unrotated cells — the defect verbatim — because every guard called
+`setLevelFraming` itself and none drove the handler; and dropping the mid-orbit
+pose blend, because `restore()` still lands correctly and nothing checked the
+path. Both closed, 5/5 on the re-run, and `_initFraming` now exists to be
+drivable for the same reason `_initTransitions` does.
+
+Counting §P21's payload guard and its stall guard, that is **four** guards in
+two phases that passed without exercising their subject.
+
+### State
+
+265 tests, 21 gated shots, gate PASS, the 20 pre-existing shots byte-identical
+to `main`. Nine levels; the curve is `0,0,1,1,2,3,4,5,6`, non-decreasing and
+every value measured. Campaign branching moved from 358 positions to 402 with
+the fork count still **1** — `teach-01` is a corridor on purpose, because a
+level teaching one thing must not also ask the player to choose.
+
 ---
 
 ## Attribution

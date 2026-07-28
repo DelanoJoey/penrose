@@ -28,8 +28,12 @@ test('a corridor has no forks', () => {
 });
 
 test('the campaign contains exactly one fork', () => {
-  // Measured 2026-07-27 across all eight levels: 358 positions, one fork, in
-  // post-05. This is the number the next content phase exists to move.
+  // Measured across all NINE levels: 402 positions, one fork, in post-05.
+  //
+  // It was 358 across eight before `teach-01`, which adds 44 positions and no
+  // fork — a forced corridor on purpose, because a level teaching one thing
+  // must not also ask the player to choose. The fork count standing still while
+  // the campaign grows is the number the next content phase exists to move.
   let positions = 0;
   let forks = 0;
   for (const name of ORDER) {
@@ -38,7 +42,7 @@ test('the campaign contains exactly one fork', () => {
     positions += b.positions;
     forks += b.forks;
   }
-  assert.equal(positions, 358);
+  assert.equal(positions, 402);
   assert.equal(forks, 1);
 });
 
