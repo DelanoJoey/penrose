@@ -2637,6 +2637,30 @@ actually did, which nobody has yet: `docs/playtest/PROTOCOL.md` fixes four
 hypotheses and their falsification conditions in advance, and the next action is
 a fresh player in front of it.
 
+### Postscript — somebody played it the same day, and stopped at level 4
+
+Recorded in full in `docs/playtest/OBSERVATIONS.md`. Not a protocol session, so
+H1 is still untested. What it established:
+
+**Two of the eight levels are solvable in a standing view.** From `spur-01`
+onward, no rotation of the figure lets a player walk start-to-goal — the route
+must be interrupted, rotated mid-way and resumed. The declared curve
+`0,0,1,2,3,4,5,6` counts turns, so it reads as a ramp; what actually happens is
+one step change at level 3, from *walk* to *walk, rotate, walk*, and **nothing
+teaches it.** `teach-00` gives screen-adjacency an entire level; interleaved
+rotation just becomes mandatory and stays mandatory.
+
+That is the defect P18 closed, one level up, found the same way — by somebody
+playing. It is worth noticing that P21 built an instrument for exactly this and
+the finding arrived before the instrument was used; the instrument is still
+right, and the lesson from §P17 holds twice over.
+
+**And it is not difficulty.** `span-02`, where play stopped, has **zero forks**
+and a maximum degree of 2. There is no decision in it to get wrong. So a
+rotation teaching level ranks ahead of more content: six of eight levels already
+require the untaught skill, and more levels of the same kind multiply the
+opacity rather than the challenge.
+
 ---
 
 ## Attribution
