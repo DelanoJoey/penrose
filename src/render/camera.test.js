@@ -705,3 +705,53 @@ test('a live rotation LANDS on the framing composed for the view it arrives in',
   assert.ok(Math.abs(h.rig.frustumSize - want.frustum) < 1e-9,
     `frustum landed at ${h.rig.frustumSize}, wanted ${want.frustum}`);
 });
+
+test('the level/loaded HANDLER frames for the rotation in force, not the raw cells', () => {
+  // Drives the real wiring. Guards that called setLevelFraming themselves all
+  // survived a mutant that reverted this handler to frameCells(level.cells) --
+  // which is the defect verbatim.
+  for (const turns of [0, 1, 2, 3]) {
+    const h = harness({ turns });
+    h.rig._resize = () => {};
+    h.rig._initFraming(h.ctx);
+
+    const cells = LEVELS['span-02'].cells;
+    h.ctx.emit('level/loaded', { name: 'span-02', cells });
+
+    const want = h.rig.composeFor(cells.map((c) => rotateY(c, turns)),
+      { fillY: 0.70, fillX: 0.80 });
+    assert.ok(Math.abs(h.rig.frustumSize - want.frustum) < 1e-9,
+      `turns=${turns}: framed at ${h.rig.frustumSize}, wanted ${want.frustum}`);
+    assert.ok(h.rig.camera.position.distanceTo(want.position) < 1e-9,
+      `turns=${turns}: framed the wrong rotation`);
+  }
+});
+
+test('the orbit TRAVELS toward the destination, it does not jump at the end', () => {
+  // Dropping the pose blend leaves restore() landing correctly, so a test that
+  // only checks the landing passes while every rotation ends in a visible pop.
+  const camera = makeCamera();
+  const end = {
+    position: new THREE.Vector3(60, 10, 20),
+    quaternion: new THREE.Quaternion(0, 0.3826834, 0, 0.9238795),
+    frustum: 20,
+  };
+  const withEnd = new CameraOrbit({
+    position: camera.position, quaternion: camera.quaternion, delta: 1,
+    end, startFrustum: 5,
+  });
+  const without = new CameraOrbit({
+    position: camera.position, quaternion: camera.quaternion, delta: 1,
+  });
+
+  withEnd.advance(ORBIT_SECONDS / 2);
+  without.advance(ORBIT_SECONDS / 2);
+  const a = makeCamera(), b = makeCamera();
+  withEnd.applyTo(a);
+  without.applyTo(b);
+
+  assert.ok(a.position.distanceTo(b.position) > 1e-6,
+    'mid-orbit pose is identical with and without a destination — nothing is blending');
+  assert.ok(withEnd.frustum > 5 && withEnd.frustum < 20,
+    `mid-orbit frustum ${withEnd.frustum} is not between the endpoints`);
+});

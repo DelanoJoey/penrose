@@ -741,11 +741,7 @@ export default {
      * Framing once from the unrotated cells is what left 23 of the campaign's
      * 24 rotated views composed for a picture that had moved. See §P22.
      */
-    ctx.on('level/loaded', (level) => {
-      if (Array.isArray(level?.cells)) {
-        this.setLevelFraming(level.cells, { fillY: 0.70, fillX: 0.80 });
-      }
-    });
+    this._initFraming(ctx);
 
     this._resize();
     this._onResize = () => this._resize();
@@ -892,6 +888,25 @@ export default {
    * bare OrthographicCamera and a stub ctx, then calls this. The tests
    * therefore drive the SAME wiring the engine does rather than a copy of it.
    */
+  /**
+   * Level framing wiring.
+   *
+   * Split out of init() for the same reason _initTransitions is: so
+   * src/render/camera.test.js can drive the REAL handler with no WebGL and no
+   * DOM. Testing setLevelFraming directly is not enough — mutation testing
+   * showed that reverting this handler to frame the unrotated cells, which IS
+   * the shipped defect, survived every guard that called setLevelFraming
+   * itself.
+   */
+  _initFraming(ctx) {
+    this._ctx = ctx;
+    ctx.on('level/loaded', (level) => {
+      if (Array.isArray(level?.cells)) {
+        this.setLevelFraming(level.cells, { fillY: 0.70, fillX: 0.80 });
+      }
+    });
+  },
+
   _initTransitions(ctx) {
     this._ctx = ctx;
 
