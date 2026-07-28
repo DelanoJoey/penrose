@@ -7,7 +7,7 @@ import render, {
   CameraOrbit, smootherstep, TURN_RADIANS, CAMERA_TURN_SIGN, ORBIT_SECONDS, MAX_QUEUED_TURNS,
 } from './index.js';
 import { rotateY } from '../geometry/index.js';
-import { LEVELS } from '../world/levels.js';
+import { LEVELS, ORDER } from '../world/levels.js';
 
 /**
  * Camera rotation-transition tests.
@@ -534,4 +534,174 @@ test('no wall clock, no rng, no timer, no rAF in this subsystem', () => {
   ]) {
     assert.ok(!code.includes(banned), `src/render/index.js uses ${banned}`);
   }
+});
+
+// ---------------------------------------------------- framing every rotation
+
+/**
+ * FRAMING MUST FOLLOW THE ROTATION.
+ *
+ * Composition ran once on level/loaded, from `level.cells` — the UNROTATED
+ * positions — and never again. Six of the eight campaign levels cannot be
+ * solved without rotating, so six of eight put the player in a view nothing had
+ * composed. Measured: 23 of the 24 rotated views fell outside their own
+ * frustum, and `span-02` at view 2/4 ran off the top of the frame. That is the
+ * level a player stopped on, while rotating to see what connected to what.
+ *
+ * The gate could not have caught it. rot1/rot2/rot3 each call frameCells
+ * themselves before capturing, so they photograph every rotation with a camera
+ * recomposed for that rotation — one live play never had.
+ *
+ * These use the renderer's OWN composeFor rather than a reimplementation, so
+ * they cannot drift into agreeing with themselves instead of with the renderer.
+ */
+
+function framingRig() {
+  const rig = Object.create(render);
+  rig.camera = new THREE.OrthographicCamera(-12, 12, 7.5, -7.5, 0.1, 200);
+  rig._resize = () => {};
+  return rig;
+}
+
+/**
+ * Real windows, not node's fallback. composeFor reads globalThis.innerWidth and
+ * falls back to 1 when there is none, so a test that does not set them checks
+ * containment at aspect 1 — a shape no display has. The frustum is a max() over
+ * an X term divided by aspect and a Y term that is not, so which of the two
+ * binds CHANGES with aspect.
+ */
+const ASPECTS = [[1512, 900], [1280, 1024], [1920, 1080], [2560, 1080], [900, 1400]];
+
+function withViewport([w, h], fn) {
+  const ow = globalThis.innerWidth, oh = globalThis.innerHeight;
+  Object.defineProperty(globalThis, 'innerWidth', { value: w, configurable: true });
+  Object.defineProperty(globalThis, 'innerHeight', { value: h, configurable: true });
+  try { fn(); } finally {
+    Object.defineProperty(globalThis, 'innerWidth', { value: ow, configurable: true });
+    Object.defineProperty(globalThis, 'innerHeight', { value: oh, configurable: true });
+  }
+}
+
+test('every rotation is framed for itself, every level, every aspect', () => {
+  for (const viewport of ASPECTS) {
+    withViewport(viewport, () => {
+      for (const name of ORDER) {
+        const cells = LEVELS[name].cells;
+        const rig = framingRig();
+        rig._ctx = { peek: () => ({ turns: 0 }) };
+        rig.setLevelFraming(cells, { fillY: 0.70, fillX: 0.80 });
+        for (let t = 0; t < 4; t++) {
+          const composed = rig.framingAt(t);
+          assert.ok(composed, `${name}: no framing for view ${t + 1}/4`);
+          // The frustum composed for a view must be the one that view needs.
+          const direct = rig.composeFor(cells.map((c) => rotateY(c, t)),
+            { fillY: 0.70, fillX: 0.80 });
+          assert.ok(Math.abs(composed.frustum - direct.frustum) < 1e-9,
+            `${name} view ${t + 1}/4 at ${viewport.join('x')}: framed for the wrong rotation`);
+          assert.ok(composed.target.distanceTo(direct.target) < 1e-9,
+            `${name} view ${t + 1}/4 at ${viewport.join('x')}: targeted the wrong rotation`);
+        }
+      }
+    });
+  }
+});
+
+test('NEGATIVE CONTROL — the opening framing does not fit the other views', () => {
+  // Without this the test above passes against code that framed once and never
+  // again, because "framed for view 1" and "framed for view 2" would be the
+  // same object. At least one level must genuinely need a different frustum.
+  const differ = [];
+  withViewport([1512, 900], () => {
+    for (const name of ORDER) {
+      const cells = LEVELS[name].cells;
+      const rig = framingRig();
+      const v1 = rig.composeFor(cells, { fillY: 0.70, fillX: 0.80 });
+      for (let t = 1; t < 4; t++) {
+        const vt = rig.composeFor(cells.map((c) => rotateY(c, t)), { fillY: 0.70, fillX: 0.80 });
+        if (Math.abs(vt.frustum - v1.frustum) > 1e-6 || vt.target.distanceTo(v1.target) > 1e-6) {
+          differ.push(`${name}@${t + 1}/4`);
+        }
+      }
+    }
+  });
+  // ALL 24, not 23. Two different measurements, and it is worth keeping them
+  // apart: 23 of 24 rotated views fell OUTSIDE the old frustum, which is the
+  // clipping. All 24 need a DIFFERENT frustum or target, which is the
+  // composition. `post-05` view 4/4 is the one that stayed in frame while still
+  // being framed for a picture that had moved.
+  assert.equal(differ.length, 24,
+    `every rotated view should need its own framing, got ${differ.length}`);
+});
+
+test('an orbit with a destination lands on it, and still moves nothing at progress 0', () => {
+  const camera = makeCamera();
+  const startPos = camera.position.clone();
+  const startQuat = camera.quaternion.clone();
+  const end = {
+    position: new THREE.Vector3(10, 20, 30),
+    quaternion: new THREE.Quaternion(0, 0.3826834, 0, 0.9238795),
+    frustum: 11,
+  };
+  const orbit = new CameraOrbit({
+    position: startPos, quaternion: startQuat, delta: 1,
+    end, startFrustum: 5,
+  });
+
+  // Progress 0 must reproduce the start pose EXACTLY — the property the whole
+  // transition rests on, and the one a destination could have broken.
+  orbit.applyTo(camera);
+  assert.ok(camera.position.distanceTo(startPos) < 1e-12, 'progress 0 moved the camera');
+  assert.ok(Math.abs(camera.quaternion.dot(startQuat)) > 1 - 1e-12, 'progress 0 turned the camera');
+  assert.equal(orbit.frustum, 5, 'progress 0 changed the frustum');
+
+  // And it lands on the destination, not on where it started.
+  orbit.advance(ORBIT_SECONDS + FRAME);
+  orbit.restore(camera);
+  assert.ok(camera.position.distanceTo(end.position) < 1e-12, 'did not land on the destination');
+  assert.equal(orbit.frustum, 11, 'frustum did not reach the destination');
+});
+
+test('an orbit with NO destination restores verbatim, exactly as before', () => {
+  const camera = makeCamera();
+  const startPos = camera.position.clone();
+  const orbit = new CameraOrbit({ position: startPos, quaternion: camera.quaternion, delta: 1 });
+  orbit.advance(ORBIT_SECONDS + FRAME);
+  orbit.restore(camera);
+  assert.ok(camera.position.distanceTo(startPos) < 1e-12,
+    'a destination-less orbit must restore the start pose — dev shots depend on it');
+  assert.equal(orbit.frustum, null, 'a destination-less orbit must not touch the frustum');
+});
+
+test('a bare frameCells forgets the level framing — this is what keeps the gate still', () => {
+  // Dev shots place their own camera. If an orbit then dragged that pose toward
+  // the live framing, every rotation shot would move and the gate would be
+  // measuring the game instead of the shot.
+  const rig = framingRig();
+  rig._ctx = { peek: () => ({ turns: 0 }) };
+  rig.setLevelFraming(LEVELS['loop-01'].cells, { fillY: 0.70, fillX: 0.80 });
+  assert.ok(rig.framingAt(1), 'live framing should be recorded');
+  rig.frameCells([[0, 0, 0], [1, 0, 0]], { fillY: 0.5, fillX: 0.5 });
+  assert.equal(rig.framingAt(1), null, 'a dev shot must clear the live framing');
+});
+
+test('a live rotation LANDS on the framing composed for the view it arrives in', () => {
+  // The integration the unit tests above miss: composeFor can be right and
+  // framingAt can be right while _drain never passes the destination to the
+  // orbit, which is exactly how this defect would come back.
+  const h = harness();
+  h.rig._resize = () => {};
+  const cells = LEVELS['span-02'].cells;
+  h.rig.setLevelFraming(cells, { fillY: 0.70, fillX: 0.80 });
+
+  const want = h.rig.framingAt(1);
+  assert.ok(want, 'no destination framing for view 2/4');
+
+  h.rig.requestRotation(1);
+  h.pump(ORBIT_FRAMES + 2);
+
+  assert.equal(h.world.turns, 1, 'the world did not commit the turn');
+  assert.ok(h.rig.camera.position.distanceTo(want.position) < 1e-9,
+    'the camera landed on a pose that was not composed for view 2/4');
+  assert.ok(Math.abs(h.rig.frustumSize - want.frustum) < 1e-9,
+    `frustum landed at ${h.rig.frustumSize}, wanted ${want.frustum}`);
 });

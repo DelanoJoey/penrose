@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+// ARCHITECTURE.md §3.3 permits this one import: geometry is a pure module with
+// no engine state, and the framing below must agree with it exactly about what
+// a quarter turn does to a cell.
+import { rotateY } from '../geometry/index.js';
 
 /**
  * Renderer + isometric camera rig.
@@ -477,6 +481,9 @@ const WORLD_UP = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
 const ORBIT_AXIS = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
 const ORIGIN = /* @__PURE__ */ new THREE.Vector3(0, 0, 0);
 const _q = /* @__PURE__ */ new THREE.Quaternion();
+/** Scratch for the start->end pose blend inside CameraOrbit.applyTo. */
+const _pose = /* @__PURE__ */ new THREE.Vector3();
+const _pq = /* @__PURE__ */ new THREE.Quaternion();
 
 /**
  * Smootherstep, 6u^5 - 15u^4 + 10u^3. Zero first AND second derivative at both
@@ -501,10 +508,45 @@ export function smootherstep(u) {
  * The only clock is the dt handed to `advance()`.
  */
 export class CameraOrbit {
-  constructor({ position, quaternion, delta = 1, fromTurns = 0, duration = ORBIT_SECONDS } = {}) {
-    /** Pose the orbit started from. Restored verbatim when it completes. */
+  constructor({
+    position, quaternion, delta = 1, fromTurns = 0, duration = ORBIT_SECONDS,
+    end = null, startFrustum = null,
+  } = {}) {
+    /** Pose the orbit started from. */
     this.startPosition = new THREE.Vector3().copy(position ?? ORIGIN);
     this.startQuaternion = new THREE.Quaternion().copy(quaternion ?? new THREE.Quaternion());
+
+    /**
+     * Pose the orbit LANDS on, defaulting to the pose it started from.
+     *
+     * WHY. Framing was composed once per level, from the unrotated cells, and
+     * never again — so every view but the opening one was framed for a picture
+     * no longer on screen. Measured: 23 of the campaign's 24 rotated views fell
+     * outside their own frustum and `span-02` at view 2/4 ran off the top of
+     * the frame. That is the level a player stopped on, while rotating to see
+     * what connected to what.
+     *
+     * Fitting ONE frustum to all four rotations fixes the clipping and costs
+     * 1.5x-2.2x in figure size, because rotateY turns about the world origin and
+     * the figures do not sit on it. Measured, and rejected.
+     *
+     * So the orbit lands somewhere new instead, and the identity that made the
+     * end-swap exact is what makes it free:
+     *
+     *     image(A(P), world T) === image(P, world T+1)
+     *
+     * for A the quarter turn about the pivot. Travelling from `start` to
+     * `A(end)` while the world still shows T, then restoring to `end` as the
+     * world becomes T+1, is continuous at both ends by that identity — exactly
+     * as travelling from `start` to `A(start)` was. The old behaviour is the
+     * special case end === start, which is what an orbit with no destination
+     * still does, and dev shots depend on that.
+     */
+    this.endPosition = new THREE.Vector3().copy(end?.position ?? this.startPosition);
+    this.endQuaternion = new THREE.Quaternion().copy(end?.quaternion ?? this.startQuaternion);
+    /** Frustum half-height at each end. Null means "do not touch the frustum". */
+    this.startFrustum = Number.isFinite(startFrustum) ? startFrustum : null;
+    this.endFrustum = Number.isFinite(end?.frustum) ? end.frustum : this.startFrustum;
     /** Quarter turns this orbit commits, signed. */
     this.delta = Math.trunc(delta) || 1;
     /** World rotation state this orbit started from. The commit target is from+delta. */
@@ -543,16 +585,32 @@ export class CameraOrbit {
    * begins.
    */
   applyTo(camera, pivot = ORIGIN) {
+    // The pose being swung blends start->end on the SAME easing the angle uses,
+    // so the two arrive together. With no destination this is exactly the start
+    // pose at every u and the arithmetic below is bit-for-bit unchanged.
+    const u = smootherstep(this.progress);
+    _pose.copy(this.startPosition).lerp(this.endPosition, u);
+    _pq.copy(this.startQuaternion).slerp(this.endQuaternion, u);
+
     _q.setFromAxisAngle(ORBIT_AXIS, this.angle);
-    camera.position.copy(this.startPosition).sub(pivot).applyQuaternion(_q).add(pivot);
-    camera.quaternion.copy(this.startQuaternion).premultiply(_q);
+    camera.position.copy(_pose).sub(pivot).applyQuaternion(_q).add(pivot);
+    camera.quaternion.copy(_pq).premultiply(_q);
     return camera;
+  }
+
+  /** Frustum half-height at the current progress, or null if unmanaged. */
+  get frustum() {
+    if (this.startFrustum === null || this.endFrustum === null) return null;
+    const u = smootherstep(this.progress);
+    return this.startFrustum + (this.endFrustum - this.startFrustum) * u;
   }
 
   /** Put the camera back exactly where the orbit found it. */
   restore(camera) {
-    camera.position.copy(this.startPosition);
-    camera.quaternion.copy(this.startQuaternion);
+    // The END pose, which IS the start pose unless a destination was supplied —
+    // so a destination-less orbit still restores verbatim, as it always did.
+    camera.position.copy(this.endPosition);
+    camera.quaternion.copy(this.endQuaternion);
     return camera;
   }
 
@@ -677,8 +735,16 @@ export default {
      * screen bounds rather than from a hand-placed camera that happened to
      * point near the structure. Dev shots run after this and override it.
      */
+    /**
+     * setLevelFraming, not frameCells: it composes for the rotation in force
+     * AND remembers how, so each later quarter turn composes the same way.
+     * Framing once from the unrotated cells is what left 23 of the campaign's
+     * 24 rotated views composed for a picture that had moved. See §P22.
+     */
     ctx.on('level/loaded', (level) => {
-      if (Array.isArray(level?.cells)) this.frameCells(level.cells, { fillY: 0.70, fillX: 0.80 });
+      if (Array.isArray(level?.cells)) {
+        this.setLevelFraming(level.cells, { fillY: 0.70, fillX: 0.80 });
+      }
     });
 
     this._resize();
@@ -717,7 +783,16 @@ export default {
    *                centring: a mass placed at true centre reads as sagging.
    * @param shiftX  fraction of frame width to move the subject right
    */
-  frameCells(cells, {
+  /**
+   * The pose a framing WOULD produce, without touching the camera.
+   *
+   * Split out of frameCells because the rotation transition has to know where
+   * it is going before it gets there: the orbit blends toward the framing
+   * composed for the rotation it is about to commit. Returning the pose instead
+   * of writing it is the difference between "recompose on arrival", which pops,
+   * and "arrive already composed", which does not.
+   */
+  composeFor(cells, {
     dir = [-1, -1, -1],
     fillX = 0.84, fillY = 0.76,
     liftY = 0.02, shiftX = 0,
@@ -758,12 +833,55 @@ export default {
     const target = new THREE.Vector3()
       .addScaledVector(x, cx)
       .addScaledVector(y, cy);
+    const position = new THREE.Vector3().copy(target).addScaledVector(z, distance);
 
-    this.camera.position.copy(target).addScaledVector(z, distance);
-    this.camera.lookAt(target);
-    this.frustumSize = frustum;
+    // Matches Object3D.lookAt for a camera exactly: same eye, same target, same
+    // up. Computed here rather than via camera.lookAt so the pose exists before
+    // there is a camera to put it on.
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(
+      new THREE.Matrix4().lookAt(position, target, this.camera?.up ?? WORLD_UP));
+
+    return { position, quaternion, frustum, target };
+  },
+
+  frameCells(cells, opts = {}) {
+    const composed = this.composeFor(cells, opts);
+    if (!composed) return null;
+
+    // A direct frameCells call is a DEV SHOT placing its own camera. Forget any
+    // live level framing, so the rotation transition does not drag the shot's
+    // pose toward the game's. This is what keeps the gate byte-identical.
+    this._levelFraming = null;
+
+    this.camera.position.copy(composed.position);
+    this.camera.quaternion.copy(composed.quaternion);
+    this.frustumSize = composed.frustum;
     this._resize();
-    return { frustum, target };
+    return { frustum: composed.frustum, target: composed.target };
+  },
+
+  /**
+   * Frame a LIVE level and remember how, so every rotation is composed the same
+   * way. frameCells alone deliberately does not remember — see above.
+   */
+  setLevelFraming(cells, opts = {}) {
+    if (!Array.isArray(cells) || cells.length === 0) return null;
+    const framed = this.frameCells(cells.map((c) => rotateY(c, this._levelTurns())), opts);
+    this._levelFraming = { cells, opts };
+    return framed;
+  },
+
+  /** The world's current quarter-turn index, or 0 if there is no world yet. */
+  _levelTurns() {
+    const t = this._ctx?.peek?.('world')?.turns;
+    return Number.isInteger(t) ? t : 0;
+  },
+
+  /** The pose this level should be seen from at `turns`, or null if unframed. */
+  framingAt(turns) {
+    const f = this._levelFraming;
+    if (!f) return null;
+    return this.composeFor(f.cells.map((c) => rotateY(c, turns)), f.opts);
   },
 
   /**
@@ -987,7 +1105,11 @@ export default {
     orbit.advance(ctx.time.dt);
 
     if (orbit.done) this._commit(ctx, orbit);
-    else orbit.applyTo(this.camera, this.orbitPivot);
+    else {
+      orbit.applyTo(this.camera, this.orbitPivot);
+      const f = orbit.frustum;
+      if (f !== null) { this.frustumSize = f; this._resize(); }
+    }
   },
 
   /**
@@ -1048,6 +1170,7 @@ export default {
     // world/rotated, our own listener would otherwise cancel an orbit that has
     // already succeeded.
     orbit.restore(this.camera);
+    if (orbit.endFrustum !== null) { this.frustumSize = orbit.endFrustum; this._resize(); }
     this._orbit = null;
 
     this._committing = true;
@@ -1068,12 +1191,26 @@ export default {
     this._pending -= step;
 
     const world = this._ctx?.peek?.('world');
+    const fromTurns = Number.isInteger(world?.turns) ? world.turns : 0;
+
+    /**
+     * Where this turn should LAND, composed the way the level was framed.
+     *
+     * Null whenever a dev shot placed the camera itself (frameCells clears the
+     * record), so a shot's orbit swings exactly as it always did and the gate
+     * stays byte-identical. Live play always has a record, because level/loaded
+     * sets one.
+     */
+    const end = this.framingAt(fromTurns + step);
+
     this._orbit = new CameraOrbit({
       position: this.camera.position,
       quaternion: this.camera.quaternion,
       delta: step,
-      fromTurns: Number.isInteger(world?.turns) ? world.turns : 0,
+      fromTurns,
       duration: this.orbitSeconds,
+      end,
+      startFrustum: end ? this.frustumSize : null,
     });
     // Progress 0 reproduces the start pose exactly, so this moves nothing.
     this._orbit.applyTo(this.camera, this.orbitPivot);
