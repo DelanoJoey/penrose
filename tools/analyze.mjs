@@ -48,6 +48,14 @@ const report = {
     minTurnsExact: p.minTurnsExact,
     flatSolvableTurns: p.flatSolvableTurns,
   },
+  // How much CHOICE the level offers, which nothing else here reports. The
+  // cost map is machinery rather than a finding, so it is dropped.
+  branching: (() => {
+    const b = s.branching(level.start, level.goal);
+    if (!b) return null;
+    const { costs, ...rest } = b;
+    return rest;
+  })(),
   perRotation: [0, 1, 2, 3].map((t) => ({
     turns: t,
     visible: s.visibility(t).size,

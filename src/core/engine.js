@@ -2,6 +2,15 @@ import { Clock } from './clock.js';
 import { makeRng } from './rng.js';
 
 /**
+ * Seconds of real time a single tick may absorb. A tab that was backgrounded
+ * for thirty seconds must not return and fast-forward 1,800 steps.
+ */
+const MAX_CATCHUP = 0.25;
+
+/** Hard bound on the inner loop, whatever the accumulator says. */
+const MAX_STEPS = 5;
+
+/**
  * The engine owns the ONLY frame loop in the project (ARCHITECTURE.md §3.1).
  * Subsystems never call requestAnimationFrame.
  *
@@ -70,13 +79,44 @@ export class Engine {
     return this.time.frame;
   }
 
-  /** Interactive loop. Never started in lockstep mode. */
+  /**
+   * Interactive loop. Never started in lockstep mode.
+   *
+   * WHY THIS IS AN ACCUMULATOR AND NOT ONE STEP PER FRAME. step() advances a
+   * CONSTANT fixedDt, so calling it once per animation frame ties simulation
+   * speed to display refresh rate: measured 1.844 sim-seconds per wall-second
+   * on a 120 Hz panel, which made every wall-clock number in METHODOLOGY --
+   * "1.633 s", "21.5 seconds of optimal play" -- true only at 60 Hz, and true
+   * nowhere it was actually being read. See METHODOLOGY §P21.
+   *
+   * The timestamp comes from requestAnimationFrame's own argument, so this file
+   * still reads no clock and src/core/engine.test.js can ban clock calls
+   * outright rather than carve out an exception a later change could widen.
+   *
+   * Both clamps drop time rather than repaying it: after a stall the simulation
+   * is permanently behind wall time, which is correct for a game with no
+   * network and nothing to reconcile, and is what stops a returning tab from
+   * animating a burst nobody can follow.
+   */
   start() {
     if (this._running || this.config.lockstep) return;
     this._running = true;
-    const tick = () => {
+    let last = null;
+    let acc = 0;
+    const tick = (now) => {
       if (!this._running) return;
-      this.step();
+      if (last === null) last = now;
+      acc += Math.min((now - last) / 1000, MAX_CATCHUP);
+      last = now;
+      let steps = 0;
+      while (acc >= this.time.fixedDt && steps < MAX_STEPS) {
+        this.step();
+        acc -= this.time.fixedDt;
+        steps += 1;
+      }
+      // Hitting the bound means we are behind by more than we will ever repay.
+      // Keeping the remainder would spend the next several frames draining it.
+      if (steps === MAX_STEPS) acc = 0;
       this._rafId = requestAnimationFrame(tick);
     };
     this._rafId = requestAnimationFrame(tick);

@@ -2484,6 +2484,161 @@ a false premise.
 
 ---
 
+## P21 — the game was running at 1.8x, and the campaign contains one decision
+
+**Completed 2026-07-27.** The handoff's first open item was "more levels, from
+the pool of 928 shapes at 4 turns and 26 at 5". That would have repeated §P20's
+mistake in a new place, and measuring the campaign before mining the pool is
+what showed it.
+
+### Turn count does not predict whether a level contains a choice
+
+Measured across all eight campaign levels, over every standable cell in every
+rotation — 358 positions:
+
+| | |
+|---|---|
+| mean legal walks | **1.53** of 4 |
+| positions with <= 1 way out | **44%** |
+| positions with zero legal walks | **10** |
+| positions offering 3 or more walks | **1** |
+| positions that are a FORK | **1** |
+
+A **fork** is a position where two different neighbours each strictly reduce the
+remaining walks to the goal, so the player has to pick and the pick is not
+forced. There is one in the entire game, in `post-05`. `crook-06` requires six
+turns, is the last level, and has none. `arm-04` has par 12 and has none.
+
+The property is not scarce in the material — 1,734 of 5,496 bare-circuit pairs
+have at least one, and 478,426 of 982,104 augmented pairs do. Of the 928 shapes
+`search.mjs` reports at four turns, **428 contain a fork.** Nothing had ever
+computed the number, so nothing had ever selected on it, and turn count — the
+axis every shipping level was chosen on — is orthogonal to it.
+
+**A first pass measured this wrong and the wrong number looked meaningful.** It
+counted positions whose neighbours merely DIFFER in remaining cost and reported
+173 of 358. That is not a decision count; it is the count of corridor positions
+from which the player may also walk backwards. Recorded because "173 of 358"
+would have read as a healthy figure and sent level selection somewhere worse
+than turn count already does.
+
+### What no level in this game can do, which is a proof rather than a search
+
+Being *lost* is available. Being **wrong** is not:
+
+> On an undirected, unit-cost graph, adjacent vertices' distances to a fixed
+> target differ by at most 1. So one step off an optimal route always leaves the
+> goal exactly two walks further away than the best step would have — one to
+> come back, one to retake.
+
+Every level, every figure, under this movement model. Running it over 982,104
+pairs returns 0 exceptions and adds nothing the two lines already give. Making a
+mistake expensive is not a level-selection problem; it needs a change to the
+movement model, and that is a bigger phase than this one.
+
+### The simulation had been running at display refresh rate since P0
+
+`Engine.step()` advances a constant `fixedDt` and was called once per
+`requestAnimationFrame`, with no accumulator and no clamp. Measured in a headed
+browser on the machine the play-test will run on:
+
+```
+wall seconds        3.001
+engine frames         332      ->  110.6 frames per wall-second
+simulated seconds   5.533      ->  1.844 sim-seconds per wall-second
+```
+
+Every animation is driven by `ctx.time.dt`, which is always `fixedDt`, so
+`ORBIT_SECONDS = 0.45` elapsed in 0.244 wall-seconds and `MOVE_SECONDS = 0.22`
+in 0.119. `teach-00`, "measured by playthrough at 1.633 s" in §P18, took 0.886.
+The "21.5 seconds of optimal play" was about 11.7.
+
+This never violated the determinism contract — frame N still produced identical
+pixels, which is what ARCHITECTURE §1 requires. **What it violated was an
+assumption nobody had written down**: every wall-clock number this document has
+ever quoted was true at 60 Hz and true nowhere it was actually being read. After
+the fix: **1.000 sim-seconds per wall-second, 180 frames in 3.001 s.**
+
+The accumulator takes its timestamp from `requestAnimationFrame`'s own argument
+rather than `performance.now()`, which is what lets the new guard ban clock
+reads in `src/core/engine.js` outright instead of carving out an exception a
+later change could widen. Both clamps DROP time rather than repaying it, and
+the accumulator must be cleared when `MAX_STEPS` binds — keeping the remainder
+spends the next several frames draining it, which is the burst the clamp exists
+to prevent.
+
+**`npm run gate` could not have caught a regression here, and nearly was asked
+to.** It captures the shot set twice and diffs the two captures, so it proves
+determinism on whatever it is pointed at and would pass just as happily on a
+branch that changed every pixel. This repository commits no baseline images.
+Branch-versus-main is a hand-run comparison, and it is the one that was run:
+20 shots, `"identical": true`.
+
+### Events alone could not have recorded a play session
+
+`src/dev/trace.js` records a session under `?trace=1`. The design question worth
+keeping is why it listens for keys at all when the engine emits nine events.
+
+`src/ui` dispatches a movement key by calling `player.step()` **directly**, not
+by emitting, and `step()` has two paths that emit nothing: it returns early
+while the level is lost, and it skips `player/blocked` when no level is loaded.
+Driven to the fail state in a real browser, four keypresses in the retry window
+produced **four key entries and zero engine events.** An events-only recorder
+would have shown nothing at all for four real presses — which is exactly the
+ambiguity that made "I cant do anything but bounce around" unreadable.
+
+The recorder stores raw `code`/`key` and does not classify them; `resolveKey`
+stays in `src/ui` and interpretation happens offline. A trace is a record, not
+an interpreter.
+
+Two constraints that are not obvious. It must be inert in capture and lockstep,
+because ARCHITECTURE §4 forbids any path that advances state outside `__PUMP__`
+and a second keydown listener is exactly that. And it must be incapable of
+throwing, because `Engine._emit` still has no try/catch and one throwing
+listener aborts every listener after it.
+
+**That second constraint is the fresh argument open item B3 has been waiting
+for.** The record says the missing try/catch was "declined deliberately in P4"
+with the reasoning written down nowhere. The argument on the merits is: the
+engine's failure isolation is currently supplied by *convention among
+listeners*, and every listener added is a place that convention can lapse. B3 is
+still not opened — but it no longer needs the P4 rationale recovered to be
+argued.
+
+### Mutation testing, and a mutant withdrawn rather than counted
+
+Seven mutants, six caught. The survivor was `acc >= fixedDt` weakened to
+`acc > 0`, and it survived because it **violates nothing**: it steps once,
+subtracts a full timestep regardless, and lets the accumulator go negative, so
+it fires on alternate ticks at 120 Hz and twice per tick at 30 Hz. Identical
+60 Hz average, sloppier bookkeeping. The guard was right and the mutant was
+wrong — the same call §P18 made, and the second time this project has had to
+make it.
+
+Replaced with the mutation of that line that does change the rate — dropping
+the remainder each tick instead of subtracting one step's worth — which three
+tests catch.
+
+One test defect found the same way it was found in §P19: the payload guard used
+a constant fake clock, so `t` was 0 by construction and it would have passed
+against a recorder that never stamped anything.
+
+### Also
+
+ARCHITECTURE §3.3's event table listed eight events; the project emits nine.
+`level/failed` shipped in P19 undocumented. Table and code now agree.
+
+### State
+
+243 tests, 20 gated shots, gate PASS, and 20 shots byte-identical to `main`.
+Eight levels, unchanged — **this phase added no content and was not supposed
+to.** What it added is the ability to find out what the last three phases
+actually did, which nobody has yet: `docs/playtest/PROTOCOL.md` fixes four
+hypotheses and their falsification conditions in advance, and the next action is
+a fresh player in front of it.
+
+---
+
 ## Attribution
 
 `tools/baseline.mjs`, `tools/imagediff.mjs` and `tools/profile.mjs` are adapted

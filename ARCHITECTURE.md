@@ -130,6 +130,7 @@ engine state.
 | `level/loaded` | `world` | `{ name, cells, start, goal }` |
 | `campaign/complete` | `campaign` | `{ levels }` — the last level in `ORDER` was solved. Emitted once; a further solve is ignored. |
 | `level/solved` | `player` | `{ moves, turns }` — `turns` is the number of quarter-turns the player *spent* on this level, a solve statistic alongside `moves`. It is **not** the current rotation index; read that from `ctx.peek('world').turns`. |
+| `level/failed` | `player` | `{ moves, budget, turns }` — the move budget was spent without solving. Checked AFTER the solve and gated on `!solved`, so a final walk onto the goal wins even when it is the last one allowed. Added in P18–P20 and undocumented here until P21. |
 
 **An event may not carry a timestamp.** Anything time-derived must be read from
 `ctx.time` at the point of use, or the payload becomes a nondeterminism channel.
